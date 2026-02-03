@@ -31,6 +31,8 @@ export const initialDesigns: Design[] = [
 
 // --- DESIGNS ---
 
+// --- DESIGNS ---
+
 export const fetchDesigns = async (): Promise<Design[]> => {
     if (!isSupabaseConfigured) {
         const local = localStorage.getItem(DESIGNS_KEY);
@@ -40,7 +42,7 @@ export const fetchDesigns = async (): Promise<Design[]> => {
     const { data, error } = await supabase
         .from('designs')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('createdat', { ascending: false });
 
     if (error) {
         console.error('Error fetching designs:', error);
@@ -54,9 +56,10 @@ export const fetchDesigns = async (): Promise<Design[]> => {
         name: item.name,
         color: item.color,
         fabric: item.fabric,
-        imageUrl: item.image_url,
+        imageUrl: item.imageurl,
         inventory: item.inventory,
-        createdAt: new Date(item.created_at).getTime()
+        childType: item.childtype,
+        createdAt: Number(item.createdat)
     }));
 };
 
@@ -77,12 +80,17 @@ export const syncDesign = async (design: Design) => {
             name: design.name,
             color: design.color,
             fabric: design.fabric,
-            image_url: design.imageUrl,
+            imageurl: design.imageUrl,
             inventory: design.inventory,
-            created_at: new Date(design.createdAt).toISOString()
+            childtype: design.childType,
+            createdat: design.createdAt
         });
 
-    if (error) console.error('Error syncing design:', error);
+    if (error) {
+        console.error('Error syncing design:', error);
+        alert('Sync Error: ' + error.message);
+        return false;
+    }
 };
 
 export const removeDesign = async (id: string) => {
@@ -110,8 +118,8 @@ export const fetchOrders = async (): Promise<Order[]> => {
 
     const { data, error } = await supabase
         .from('orders')
-        .select('*, designs(name)')
-        .order('created_at', { ascending: false });
+        .select('*')
+        .order('createdat', { ascending: false });
 
     if (error) {
         console.error('Error fetching orders:', error);
@@ -120,12 +128,13 @@ export const fetchOrders = async (): Promise<Order[]> => {
 
     return data.map(item => ({
         id: item.id,
-        designId: item.design_id,
-        designName: item.designs?.name || 'Unknown Design',
-        comboType: item.combo_type,
-        selectedSizes: item.selected_sizes,
+        designId: item.designid,
+        // designName will be resolved in the UI using the designs list
+        designName: 'Loading...',
+        comboType: item.combotype,
+        selectedSizes: item.selectedsizes,
         status: item.status,
-        createdAt: new Date(item.created_at).getTime()
+        createdAt: Number(item.createdat)
     }));
 };
 
@@ -152,13 +161,18 @@ export const submitOrder = async (orderData: Partial<Order>) => {
     const { error } = await supabase
         .from('orders')
         .insert({
-            design_id: orderData.designId,
-            combo_type: orderData.comboType,
-            selected_sizes: orderData.selectedSizes,
-            status: 'pending'
+            id: Math.random().toString(36).substr(2, 9),
+            designid: orderData.designId,
+            combotype: orderData.comboType,
+            selectedsizes: orderData.selectedSizes,
+            status: 'pending',
+            createdat: Date.now()
         });
 
-    if (error) console.error('Error submitting order:', error);
+    if (error) {
+        console.error('Error submitting order:', error);
+        alert('Failed to submit order: ' + error.message);
+    }
 };
 
 export const updateOrderStatus = async (orderId: string, status: string) => {
@@ -261,12 +275,27 @@ export const exportImagesToZip = async (designs: Design[], onProgress?: (p: numb
 export const pushLocalToCloud = async (): Promise<boolean> => {
     if (!isSupabaseConfigured) return false;
 
-    const localDesigns = JSON.parse(localStorage.getItem(DESIGNS_KEY) || '[]');
+    let localDesigns = JSON.parse(localStorage.getItem(DESIGNS_KEY) || '[]');
+    if (localDesigns.length === 0) {
+        localDesigns = initialDesigns;
+    }
     if (localDesigns.length === 0) return true;
+
+    // Map local designs (CamelCase keys) to DB columns (lowercase)
+    const payload = localDesigns.map((d: any) => ({
+        id: d.id,
+        name: d.name,
+        color: d.color,
+        fabric: d.fabric,
+        imageurl: d.imageUrl,
+        inventory: d.inventory,
+        childtype: d.childType,
+        createdat: d.createdAt
+    }));
 
     const { error } = await supabase
         .from('designs')
-        .upsert(localDesigns);
+        .upsert(payload);
 
     if (error) {
         console.error('Migration error:', error);

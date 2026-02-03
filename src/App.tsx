@@ -37,10 +37,11 @@ function App() {
         init();
     }, []);
 
-    const updateInventory = async (designId: string, category: string, size: string, change: number) => {
+    const updateInventory = async (designId: string, category: string, size: string, newValue: number) => {
         let updatedDesign: Design | null = null;
 
-        setDesigns(prev => prev.map(d => {
+        // 1. Calculate the new state synchronously based on current 'designs'
+        const newDesigns = designs.map(d => {
             if (d.id === designId) {
                 const cat = category as keyof Design['inventory'];
                 updatedDesign = {
@@ -49,16 +50,19 @@ function App() {
                         ...d.inventory,
                         [cat]: {
                             ...(d.inventory[cat] as any),
-                            [size]: Math.max(0, (d.inventory[cat] as any)[size] + change)
+                            [size]: Math.max(0, newValue)
                         }
                     }
                 };
                 return updatedDesign;
             }
             return d;
-        }));
+        });
 
+        // 2. Update React State
         if (updatedDesign) {
+            setDesigns(newDesigns);
+            // 3. Sync to Database
             await syncDesign(updatedDesign);
         }
     };
@@ -101,7 +105,13 @@ function App() {
             const category = member === 'Father' ? 'men' :
                 member === 'Mother' ? 'women' :
                     member === 'Son' ? 'boys' : 'girls';
-            await updateInventory(order.designId, category, size, -1);
+
+            // Find current stock
+            const design = designs.find(d => d.id === order.designId);
+            if (design) {
+                const currentStock = (design.inventory[category as keyof typeof design.inventory] as any)[size] || 0;
+                await updateInventory(order.designId, category, size, Math.max(0, currentStock - 1));
+            }
         }
 
         // 2. Update Order Status

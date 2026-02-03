@@ -246,7 +246,7 @@ Status: ${order.status.toUpperCase()}
                                                         {('boys' === cat || 'girls' === cat) ? (
                                                             <InlineInput
                                                                 value={(design.inventory[cat] as any)[size]}
-                                                                onUpdate={(newVal) => updateInventory(design.id, cat, size, newVal - (design.inventory[cat] as any)[size])}
+                                                                onUpdate={(newVal) => updateInventory(design.id, cat, size, newVal)}
                                                             />
                                                         ) : <div style={{ opacity: 0.1, textAlign: 'center' }}>-</div>}
                                                     </td>
@@ -256,7 +256,7 @@ Status: ${order.status.toUpperCase()}
                                                         {('men' === cat || 'women' === cat) ? (
                                                             <InlineInput
                                                                 value={(design.inventory[cat] as any)[size]}
-                                                                onUpdate={(newVal) => updateInventory(design.id, cat, size, newVal - (design.inventory[cat] as any)[size])}
+                                                                onUpdate={(newVal) => updateInventory(design.id, cat, size, newVal)}
                                                             />
                                                         ) : <div style={{ opacity: 0.1, textAlign: 'center' }}>-</div>}
                                                     </td>
@@ -299,7 +299,9 @@ Status: ${order.status.toUpperCase()}
                                         <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '4px' }}>
                                             Order #{order.id.slice(-6).toUpperCase()} • {new Date(order.createdAt).toLocaleTimeString()}
                                         </div>
-                                        <h3 style={{ margin: 0 }}>{order.designId}</h3>
+                                        <h3 style={{ margin: 0 }}>
+                                            {designs.find(d => d.id === order.designId)?.name || 'Unknown Design'}
+                                        </h3>
                                         <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
                                             <span className="badge badge-info">{order.comboType}</span>
                                             {Object.entries(order.selectedSizes).map(([member, size]) => (
