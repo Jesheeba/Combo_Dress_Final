@@ -37,6 +37,7 @@ export interface Design {
   imageUrl: string;
   inventory: GranularInventory;
   childType?: 'boys' | 'girls' | 'unisex' | 'none';
+  label?: string;
   createdAt: number;
 }
 

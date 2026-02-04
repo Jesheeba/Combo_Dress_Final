@@ -324,7 +324,7 @@ const CustomerGallery: React.FC<CustomerGalleryProps> = ({ designs, onSelect, on
                             <div style={{ padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <div style={{ display: 'flex', gap: '4px' }}>
                                     <Sparkles size={16} color="var(--primary)" />
-                                    <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--primary)' }}>PREMIUM DESIGN</span>
+                                    <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--primary)', textTransform: 'uppercase' }}>{design.label || 'PREMIUM DESIGN'}</span>
                                 </div>
                                 <button className={`btn ${selectedDesign?.id === design.id ? 'btn-primary' : 'btn-ghost'}`} style={{ padding: '8px 16px' }}>
                                     {selectedDesign?.id === design.id ? 'Selected' : 'Select'}

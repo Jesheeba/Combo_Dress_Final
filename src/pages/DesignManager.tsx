@@ -28,7 +28,8 @@ const DesignManager: React.FC<DesignManagerProps> = ({ editingDesign, onSave, on
             women: emptyAdult(),
             boys: emptyKids(),
             girls: emptyKids()
-        }
+        },
+        label: 'PREMIUM DESIGN'
     });
 
     useEffect(() => {
@@ -166,6 +167,13 @@ const DesignManager: React.FC<DesignManagerProps> = ({ editingDesign, onSave, on
                                     <option value="girls">Girls</option>
                                     <option value="unisex">Unisex (Both)</option>
                                 </select>
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>Product Badge / Label</label>
+                                <input
+                                    className="input" placeholder="e.g. PREMIUM DESIGN, NEW ARRIVAL, TRENDING"
+                                    value={formData.label || ''} onChange={(e) => setFormData({ ...formData, label: e.target.value })}
+                                />
                             </div>
                         </div>
 

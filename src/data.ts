@@ -25,6 +25,7 @@ export const initialDesigns: Design[] = [
             boys: { ...emptyKids(), '0-1': 20, '1-2': 3, '4-5': 2, '5-6': 6, '6-7': 3, '7-8': 1, '9-10': 3, '13-14': 3 },
             girls: { ...emptyKids(), '0-1': 2, '2-3': 5, '3-4': 6, '5-6': 4, '6-7': 2, '9-10': 3, '11-12': 2 }
         },
+        label: 'PREMIUM DESIGN',
         createdAt: Date.now()
     }
 ];
@@ -59,6 +60,7 @@ export const fetchDesigns = async (): Promise<Design[]> => {
         imageUrl: item.imageurl,
         inventory: item.inventory,
         childType: item.childtype,
+        label: item.label,
         createdAt: Number(item.createdat)
     }));
 };
@@ -83,6 +85,7 @@ export const syncDesign = async (design: Design) => {
             imageurl: design.imageUrl,
             inventory: design.inventory,
             childtype: design.childType,
+            label: design.label,
             createdat: design.createdAt
         });
 
@@ -290,6 +293,7 @@ export const pushLocalToCloud = async (): Promise<boolean> => {
         imageurl: d.imageUrl,
         inventory: d.inventory,
         childtype: d.childType,
+        label: d.label,
         createdat: d.createdAt
     }));
 
