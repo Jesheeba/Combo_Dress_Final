@@ -138,7 +138,7 @@ function App() {
                         borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin 1s linear infinite'
                     }} />
                     <style>{`@keyframes spin { 100% { transform: rotate(360deg); } }`}</style>
-                    <p style={{ marginTop: '16px', color: 'var(--text-muted)' }}>Synchronizing Database...</p>
+                    <p style={{ marginTop: '16px', color: 'var(--text-muted)' }}>Loading TailorPro Store...</p>
                 </div>
             </div>
         );
