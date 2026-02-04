@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import type { Design, ComboType, AdultSizeStock, KidsSizeStock } from '../types';
-import { Sparkles, ArrowRight, CheckCircle, Search, Filter, Users, Baby, ArrowLeft } from 'lucide-react';
+import { Sparkles, ArrowRight, CheckCircle, Search, Filter, Users, Baby, ArrowLeft, Download } from 'lucide-react';
+import { downloadSingleImage } from '../data';
 
 interface CustomerGalleryProps {
     designs: Design[];
@@ -21,6 +22,7 @@ const CustomerGallery: React.FC<CustomerGalleryProps> = ({ designs, onSelect, on
         'boys': '4-5',
         'girls': '4-5'
     });
+    const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
 
     const adultSizes: (keyof AdultSizeStock)[] = ['M', 'L', 'XL', 'XXL', '3XL'];
     const kidsSizes: (keyof KidsSizeStock)[] = ['0-1', '1-2', '2-3', '3-4', '4-5', '5-6', '6-7', '7-8', '9-10', '11-12', '13-14'];
@@ -106,11 +108,19 @@ const CustomerGallery: React.FC<CustomerGalleryProps> = ({ designs, onSelect, on
     }, [designs, search, activeFilter, useSizeFilter, filterSizes]);
 
     return (
-        <div style={{ padding: '0 24px 48px 24px' }}>
-            <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: '12px' }}>
+        <div style={{ padding: '0 max(16px, 2vw) 48px max(16px, 2vw)', width: '100%', overflowX: 'hidden' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px' }}>
                 <button onClick={onBack} className="btn btn-ghost" style={{ gap: '8px' }} title="Back to Staff Mode">
                     <ArrowLeft size={18} />
                     Back
+                </button>
+                <button
+                    onClick={() => setIsFilterDrawerOpen(true)}
+                    className="btn btn-primary mobile-only"
+                    style={{ gap: '8px', borderRadius: '50px', padding: '8px 20px' }}
+                >
+                    <Filter size={18} />
+                    Filters
                 </button>
             </div>
             <div style={{ textAlign: 'center', marginBottom: '32px', marginTop: '12px' }}>
@@ -118,18 +128,41 @@ const CustomerGallery: React.FC<CustomerGalleryProps> = ({ designs, onSelect, on
                 <p style={{ color: 'var(--text-muted)', fontSize: '1.1rem' }}>Find the perfect matching set for your family</p>
             </div>
 
-            {/* Search and Filters */}
-            <div style={{
-                maxWidth: '1000px',
-                margin: '0 auto 48px auto',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '24px',
-                background: 'rgba(255,255,255,0.03)',
-                padding: '32px',
-                borderRadius: '24px',
-                border: '1px solid var(--glass-border)'
-            }}>
+            {/* Desktop Filters / Mobile Drawer */}
+            <div
+                className={isFilterDrawerOpen ? '' : 'tablet-up'}
+                style={isFilterDrawerOpen ? {
+                    position: 'fixed',
+                    inset: 0,
+                    background: 'rgba(15, 23, 42, 0.95)',
+                    padding: '24px',
+                    zIndex: 2000,
+                    overflowY: 'auto',
+                    overflowX: 'hidden',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '24px'
+                } : {
+                    maxWidth: '1000px',
+                    margin: '0 auto 48px auto',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '24px',
+                    background: 'rgba(255,255,255,0.03)',
+                    padding: 'max(20px, 4vw)',
+                    borderRadius: '24px',
+                    border: '1px solid var(--glass-border)',
+                    width: '100%'
+                }}
+            >
+                {isFilterDrawerOpen && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <h2 style={{ margin: 0 }}>Filters</h2>
+                        <button onClick={() => setIsFilterDrawerOpen(false)} className="btn btn-ghost" style={{ padding: '8px' }}>
+                            <ArrowLeft size={24} />
+                        </button>
+                    </div>
+                )}
                 <div style={{ position: 'relative' }}>
                     <Search
                         style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--primary)' }}
@@ -145,7 +178,7 @@ const CustomerGallery: React.FC<CustomerGalleryProps> = ({ designs, onSelect, on
                     />
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px' }}>
                     {/* All / Combos */}
                     <div>
                         <label style={{ display: 'block', marginBottom: '12px', fontSize: '0.9rem', fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
@@ -212,7 +245,7 @@ const CustomerGallery: React.FC<CustomerGalleryProps> = ({ designs, onSelect, on
                     </div>
 
                     {useSizeFilter && (
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '16px' }}>
                             {['men', 'women', 'boys', 'girls'].map(member => {
                                 // Only show size picker for members involved in current filter
                                 const isMemberActive = activeFilter === 'ALL' ||
@@ -243,6 +276,16 @@ const CustomerGallery: React.FC<CustomerGalleryProps> = ({ designs, onSelect, on
                         </div>
                     )}
                 </div>
+
+                {isFilterDrawerOpen && (
+                    <button
+                        onClick={() => setIsFilterDrawerOpen(false)}
+                        className="btn btn-primary"
+                        style={{ width: '100%', padding: '16px', borderRadius: '16px', marginTop: 'auto' }}
+                    >
+                        Apply Filters ({filteredDesigns.length} Results)
+                    </button>
+                )}
             </div>
 
             {filteredDesigns.length === 0 ? (
@@ -288,7 +331,7 @@ const CustomerGallery: React.FC<CustomerGalleryProps> = ({ designs, onSelect, on
                                 </div>
                             )}
 
-                            <div style={{ position: 'relative', height: '280px', overflow: 'hidden' }}>
+                            <div className="mobile-full-bleed" style={{ position: 'relative', height: '280px', overflow: 'hidden' }}>
                                 <img
                                     src={design.imageUrl}
                                     alt={design.name}
@@ -326,10 +369,20 @@ const CustomerGallery: React.FC<CustomerGalleryProps> = ({ designs, onSelect, on
                                     <Sparkles size={16} color="var(--primary)" />
                                     <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--primary)', textTransform: 'uppercase' }}>{design.label || 'PREMIUM DESIGN'}</span>
                                 </div>
-                                <button className={`btn ${selectedDesign?.id === design.id ? 'btn-primary' : 'btn-ghost'}`} style={{ padding: '8px 16px' }}>
-                                    {selectedDesign?.id === design.id ? 'Selected' : 'Select'}
-                                    <ArrowRight size={16} />
-                                </button>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); downloadSingleImage(design.imageUrl, design.name); }}
+                                        className="btn btn-ghost"
+                                        style={{ padding: '8px' }}
+                                        title="Download Image"
+                                    >
+                                        <Download size={18} />
+                                    </button>
+                                    <button className={`btn ${selectedDesign?.id === design.id ? 'btn-primary' : 'btn-ghost'}`} style={{ padding: '8px 16px' }}>
+                                        {selectedDesign?.id === design.id ? 'Selected' : 'Select'}
+                                        <ArrowRight size={16} />
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     ))}

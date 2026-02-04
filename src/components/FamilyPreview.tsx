@@ -79,7 +79,7 @@ const FamilyPreview: React.FC<FamilyPreviewProps> = ({ design, onPlaceOrder, onB
     const isAllInStock = comboMembers[selectedCombo].every(m => checkStock(m, selectedSizes[m]));
 
     return (
-        <div style={{ padding: '0 24px 48px 24px', maxWidth: '1200px', margin: '0 auto' }}>
+        <div style={{ padding: '0 max(16px, 2vw) 48px max(16px, 2vw)', maxWidth: '1200px', margin: '0 auto', width: '100%', overflowX: 'hidden' }}>
             <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: '20px' }}>
                 <button onClick={onBack} className="btn btn-ghost" style={{ gap: '8px' }}>
                     <ArrowLeft size={18} />
@@ -91,7 +91,7 @@ const FamilyPreview: React.FC<FamilyPreviewProps> = ({ design, onPlaceOrder, onB
                 <p style={{ color: 'var(--text-muted)' }}>Matching Set: <strong>{design.name}</strong> • {design.fabric}</p>
             </div>
 
-            <div className="glass-card" style={{ padding: '40px', display: 'flex', flexDirection: 'column', gap: '32px' }}>
+            <div className="glass-card" style={{ padding: 'max(16px, 4vw)', display: 'flex', flexDirection: 'column', gap: '32px' }}>
                 {/* Combo Selector */}
                 <div style={{ display: 'flex', justifyContent: 'center', gap: '12px' }}>
                     {(['F-M-S-D', 'F-S', 'M-D', 'F-M'] as ComboType[]).map(combo => (
@@ -106,22 +106,39 @@ const FamilyPreview: React.FC<FamilyPreviewProps> = ({ design, onPlaceOrder, onB
                     ))}
                 </div>
 
-                {/* Preview Grid */}
-                <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: `repeat(${comboMembers[selectedCombo].length}, 1fr)`,
-                    gap: '24px',
-                    background: 'rgba(0,0,0,0.2)',
-                    borderRadius: '24px',
-                    padding: '40px'
-                }}>
+                {/* Preview Grid with horizontal scroll on mobile */}
+                <div
+                    className="snap-scroll-container"
+                    style={{
+                        display: 'flex',
+                        gap: '24px',
+                        overflowX: 'auto',
+                        padding: 'max(20px, 4vw)',
+                        background: 'rgba(0,0,0,0.2)',
+                        borderRadius: '24px',
+                        scrollSnapType: 'x mandatory',
+                        WebkitOverflowScrolling: 'touch',
+                        scrollbarWidth: 'none'
+                    }}
+                >
                     {comboMembers[selectedCombo].map((member) => {
                         const isInStock = checkStock(member, selectedSizes[member]);
                         const isKid = member === 'Son' || member === 'Daughter';
                         const sizes = isKid ? kidsSizes : adultSizes;
 
                         return (
-                            <div key={member} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
+                            <div
+                                key={member}
+                                style={{
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    gap: '20px',
+                                    minWidth: '200px',
+                                    scrollSnapAlign: 'center',
+                                    flexShrink: 0
+                                }}
+                            >
                                 <div style={{
                                     width: isKid ? '120px' : '160px',
                                     height: isKid ? '180px' : '260px',
@@ -201,23 +218,24 @@ const FamilyPreview: React.FC<FamilyPreviewProps> = ({ design, onPlaceOrder, onB
                     })}
                 </div>
 
-                {/* Final Status */}
+                {/* Final Status (Sticky on mobile) */}
                 <div style={{
                     textAlign: 'center',
                     padding: '24px',
                     borderRadius: '16px',
                     background: isAllInStock ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                    border: `1px solid ${isAllInStock ? 'var(--success)' : 'var(--danger)'}`
+                    border: `1px solid ${isAllInStock ? 'var(--success)' : 'var(--danger)'}`,
+                    position: 'sticky',
+                    bottom: 'calc(80px + var(--safe-bottom))',
+                    backgroundColor: isAllInStock ? 'rgba(15, 23, 42, 0.95)' : 'rgba(239, 68, 68, 0.95)',
+                    backdropFilter: 'blur(20px)',
+                    zIndex: 100,
+                    margin: '0 -16px'
                 }}>
-                    <h2 style={{ margin: 0, color: isAllInStock ? 'var(--success)' : 'var(--danger)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
-                        {isAllInStock ? <CheckCircle size={32} /> : <XCircle size={32} />}
-                        {isAllInStock ? 'This Family Set is Available!' : 'Some sizes are currently out of stock.'}
+                    <h2 style={{ margin: 0, fontSize: '1.1rem', color: isAllInStock ? 'var(--success)' : 'var(--danger)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
+                        {isAllInStock ? <CheckCircle size={24} /> : <XCircle size={24} />}
+                        {isAllInStock ? 'Set Available!' : 'Sizes Out of Stock'}
                     </h2>
-                    <p style={{ marginTop: '8px', color: 'var(--text-muted)' }}>
-                        {isAllInStock
-                            ? 'The selected sizes for your entire family are ready for manufacturing.'
-                            : 'Please try a different size combination or contact staff for customized manufacturing.'}
-                    </p>
 
                     {isAllInStock && (
                         <button
@@ -229,9 +247,9 @@ const FamilyPreview: React.FC<FamilyPreviewProps> = ({ design, onPlaceOrder, onB
                                 setOrderSuccess(true);
                             }}
                             className="btn btn-primary"
-                            style={{ marginTop: '20px', padding: '12px 40px', fontSize: '1.1rem' }}
+                            style={{ marginTop: '16px', width: '100%', padding: '16px', fontSize: '1.1rem', borderRadius: '12px' }}
                         >
-                            {isSubmitting ? 'Processing...' : 'Confirm & Place Order'}
+                            {isSubmitting ? 'Processing...' : 'Place Family Order'}
                         </button>
                     )}
                 </div>

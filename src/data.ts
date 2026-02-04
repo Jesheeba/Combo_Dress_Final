@@ -259,7 +259,8 @@ export const exportImagesToZip = async (designs: Design[], onProgress?: (p: numb
         if (!design.imageUrl) continue;
 
         try {
-            const response = await fetch(design.imageUrl);
+            const response = await fetch(design.imageUrl, { mode: 'cors' });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const blob = await response.blob();
             const extension = design.imageUrl.split('.').pop()?.split('?')[0] || 'jpg';
             const safeName = design.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
@@ -273,6 +274,19 @@ export const exportImagesToZip = async (designs: Design[], onProgress?: (p: numb
 
     const content = await zip.generateAsync({ type: "blob" });
     saveAs(content, `tailor_designs_images_${new Date().toISOString().split('T')[0]}.zip`);
+};
+
+export const downloadSingleImage = async (url: string, name: string) => {
+    try {
+        const response = await fetch(url, { mode: 'cors' });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const blob = await response.blob();
+        const extension = url.split('.').pop()?.split('?')[0] || 'jpg';
+        saveAs(blob, `${name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.${extension}`);
+    } catch (error) {
+        console.error('Download failure:', error);
+        alert('Failed to download image. Ensure CORS is configured in your storage settings.');
+    }
 };
 
 export const pushLocalToCloud = async (): Promise<boolean> => {

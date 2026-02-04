@@ -222,11 +222,11 @@ function App() {
             </main>
 
             <footer style={{
-                padding: '24px',
+                padding: '16px',
                 textAlign: 'center',
                 color: 'var(--text-muted)',
                 borderTop: '1px solid var(--glass-border)',
-                margin: '0 24px 24px 24px'
+                margin: '0 max(16px, 2vw) 24px max(16px, 2vw)'
             }}>
                 © 2026 TailorPro Store • Local & Cloud Enabled
             </footer>

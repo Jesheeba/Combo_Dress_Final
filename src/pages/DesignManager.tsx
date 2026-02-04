@@ -63,7 +63,7 @@ const DesignManager: React.FC<DesignManagerProps> = ({ editingDesign, onSave, on
     };
 
     return (
-        <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '0 24px 48px 24px' }}>
+        <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '0 max(16px, 2vw) 48px max(16px, 2vw)', width: '100%', overflowX: 'hidden' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
                 <h1 style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     {editingDesign ? 'Edit Design' : 'Add New Design'}
@@ -75,8 +75,8 @@ const DesignManager: React.FC<DesignManagerProps> = ({ editingDesign, onSave, on
                 </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="glass-card" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '32px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: '40px' }}>
+            <form onSubmit={handleSubmit} className="glass-card" style={{ padding: 'max(16px, 2vw)', display: 'flex', flexDirection: 'column', gap: '32px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 'max(24px, 4vw)' }}>
                     {/* Image Upload Column */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                         <div
