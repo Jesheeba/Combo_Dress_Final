@@ -21,7 +21,7 @@ const CustomerGallery: React.FC<CustomerGalleryProps> = ({ designs, onSelect, se
         'boys': '4-5',
         'girls': '4-5'
     });
-    const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
+
 
     const adultSizes: (keyof AdultSizeStock)[] = ['M', 'L', 'XL', 'XXL', '3XL'];
     const kidsSizes: (keyof KidsSizeStock)[] = ['0-1', '1-2', '2-3', '3-4', '4-5', '5-6', '6-7', '7-8', '9-10', '11-12', '13-14'];
@@ -114,85 +114,57 @@ const CustomerGallery: React.FC<CustomerGalleryProps> = ({ designs, onSelect, se
     }, [designs, search, activeFilter, filterSizes]);
 
     return (
-        <div style={{ padding: '0 max(16px, 2vw) 48px max(16px, 2vw)', width: '100%', overflowX: 'hidden' }}>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginTop: '12px' }}>
-                <button
-                    onClick={() => setIsFilterDrawerOpen(true)}
-                    className="btn btn-primary mobile-only"
-                    style={{ gap: '8px', borderRadius: '50px', padding: '8px 20px' }}
-                >
-                    <Filter size={18} />
-                    Filters
-                </button>
-            </div>
-            <div style={{ textAlign: 'center', marginBottom: '32px', marginTop: '12px' }}>
-                <h1 style={{ fontSize: '2.5rem', marginBottom: '8px' }}>Our Exclusive Collection</h1>
-                <p style={{ color: 'var(--text-muted)', fontSize: '1.1rem' }}>Find the perfect matching set for your family</p>
+        <div style={{ padding: '0 max(16px, 2vw) 24px max(16px, 2vw)', width: '100%', overflowX: 'hidden' }}>
+
+            <div style={{ textAlign: 'center', marginBottom: '16px', marginTop: '0px' }}>
+                <h1 style={{ fontSize: '2rem', marginBottom: '4px' }}>Our Exclusive Collection</h1>
+                <p style={{ color: 'var(--text-muted)', fontSize: '1rem' }}>Find the perfect matching set for your family</p>
             </div>
 
-            {/* Desktop Filters / Mobile Drawer */}
+            {/* Filter Section */}
+            {/* Filter Section */}
             <div
-                className={isFilterDrawerOpen ? '' : 'tablet-up'}
-                style={isFilterDrawerOpen ? {
-                    position: 'fixed',
-                    inset: 0,
-                    background: 'var(--bg-main)',
-                    padding: '24px',
-                    zIndex: 2000,
-                    overflowY: 'auto',
-                    overflowX: 'hidden',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '24px'
-                } : {
+                style={{
                     maxWidth: '1000px',
-                    margin: '0 auto 48px auto',
+                    margin: '0 auto 0 auto',
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: '24px',
+                    gap: '16px',
                     background: 'var(--bg-secondary)',
-                    padding: 'max(24px, 4vw)',
+                    padding: '24px',
                     borderRadius: '24px',
                     border: '1px solid var(--border-subtle)',
                     width: '100%',
                     boxShadow: 'var(--shadow-sm)'
                 }}
             >
-                {isFilterDrawerOpen && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                        <h2 style={{ margin: 0 }}>Filters</h2>
-                        <button onClick={() => setIsFilterDrawerOpen(false)} className="btn btn-ghost" style={{ padding: '8px' }}>
-                            <X size={24} />
-                        </button>
-                    </div>
-                )}
                 <div style={{ position: 'relative' }}>
                     <Search
                         style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--primary)' }}
-                        size={20}
+                        size={18}
                     />
                     <input
                         type="text"
                         className="input"
                         placeholder="Search by fabric, color, or design name..."
-                        style={{ paddingLeft: '48px', height: '56px', fontSize: '1.1rem' }}
+                        style={{ paddingLeft: '44px', height: '44px', fontSize: '1rem' }}
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                     />
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
                     {/* All / Combos */}
                     <div>
-                        <label style={{ display: 'block', marginBottom: '12px', fontSize: '0.9rem', fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                            <Users size={16} style={{ verticalAlign: 'middle', marginRight: '8px' }} />
+                        <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.85rem', fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            <Users size={14} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
                             Combinations
                         </label>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                             <button
                                 onClick={() => setActiveFilter('ALL')}
                                 className={`btn ${activeFilter === 'ALL' ? 'btn-primary' : 'btn-ghost'}`}
-                                style={{ padding: '8px 16px', borderRadius: '12px', fontSize: '0.85rem' }}
+                                style={{ padding: '6px 12px', borderRadius: '10px', fontSize: '0.85rem' }}
                             >
                                 All Designs
                             </button>
@@ -201,7 +173,7 @@ const CustomerGallery: React.FC<CustomerGalleryProps> = ({ designs, onSelect, se
                                     key={combo.id}
                                     onClick={() => setActiveFilter(combo.id)}
                                     className={`btn ${activeFilter === combo.id ? 'btn-primary' : 'btn-ghost'}`}
-                                    style={{ padding: '8px 16px', borderRadius: '12px', fontSize: '0.85rem' }}
+                                    style={{ padding: '6px 12px', borderRadius: '10px', fontSize: '0.85rem' }}
                                 >
                                     {combo.label}
                                 </button>
@@ -211,17 +183,17 @@ const CustomerGallery: React.FC<CustomerGalleryProps> = ({ designs, onSelect, se
 
                     {/* Children Categories */}
                     <div>
-                        <label style={{ display: 'block', marginBottom: '12px', fontSize: '0.9rem', fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                            <Baby size={16} style={{ verticalAlign: 'middle', marginRight: '8px' }} />
+                        <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.85rem', fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            <Baby size={14} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
                             Children
                         </label>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                             {childCategories.map((cat) => (
                                 <button
                                     key={cat.id}
                                     onClick={() => setActiveFilter(cat.id)}
                                     className={`btn ${activeFilter === cat.id ? 'btn-primary' : 'btn-ghost'}`}
-                                    style={{ padding: '8px 16px', borderRadius: '12px', fontSize: '0.85rem' }}
+                                    style={{ padding: '6px 12px', borderRadius: '10px', fontSize: '0.85rem' }}
                                 >
                                     {cat.label}
                                 </button>
@@ -230,15 +202,15 @@ const CustomerGallery: React.FC<CustomerGalleryProps> = ({ designs, onSelect, se
                     </div>
                 </div>
 
-                <div style={{ padding: '24px', background: 'rgba(79, 70, 229, 0.03)', borderRadius: '16px', border: '1px solid var(--border-subtle)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                        <h4 style={{ margin: 0, fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <Filter size={18} color="var(--primary)" />
+                <div style={{ padding: '16px', background: 'rgba(79, 70, 229, 0.03)', borderRadius: '16px', border: '1px solid var(--border-subtle)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <h4 style={{ margin: 0, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Filter size={16} color="var(--primary)" />
                             Filter by Exact Sizes
                         </h4>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '16px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: '12px' }}>
                         {['men', 'women', 'boys', 'girls'].map(member => {
                             // Only show size picker for members involved in current filter
                             const isMemberActive = activeFilter === 'ALL' ||
@@ -252,12 +224,12 @@ const CustomerGallery: React.FC<CustomerGalleryProps> = ({ designs, onSelect, se
 
                             return (
                                 <div key={member}>
-                                    <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px', textTransform: 'capitalize' }}>
+                                    <label style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '2px', textTransform: 'capitalize' }}>
                                         {member} Size
                                     </label>
                                     <select
                                         className="input"
-                                        style={{ padding: '8px 12px', height: 'auto', fontSize: '1rem', background: 'var(--bg-main)' }}
+                                        style={{ padding: '4px 8px', height: 'auto', fontSize: '0.9rem', background: 'var(--bg-main)' }}
                                         value={filterSizes[member]}
                                         onChange={(e) => setFilterSizes({ ...filterSizes, [member]: e.target.value })}
                                     >
@@ -270,9 +242,9 @@ const CustomerGallery: React.FC<CustomerGalleryProps> = ({ designs, onSelect, se
                 </div>
 
                 <button
-                    onClick={() => { setShowResults(true); setIsFilterDrawerOpen(false); }}
+                    onClick={() => { setShowResults(true); }}
                     className="btn btn-primary"
-                    style={{ width: '100%', padding: '16px', borderRadius: '16px', marginTop: '16px', fontSize: '1.1rem', fontWeight: 700 }}
+                    style={{ width: '100%', padding: '12px', borderRadius: '16px', marginTop: '4px', fontSize: '1rem', fontWeight: 600 }}
                 >
                     Find Matching Outfits ({filteredDesigns.length})
                 </button>
