@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import type { Design, Role, Order, ComboType } from './types';
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import type { Design, Order, ComboType } from './types';
 import { fetchDesigns, syncDesign, removeDesign, fetchOrders, submitOrder, updateOrderStatus } from './data';
 import Navigation from './components/Navigation';
 import StaffDashboard from './pages/StaffDashboard';
@@ -7,14 +8,31 @@ import DesignManager from './pages/DesignManager';
 import CustomerGallery from './pages/CustomerGallery';
 import FamilyPreview from './components/FamilyPreview';
 
+
 function App() {
     const [designs, setDesigns] = useState<Design[]>([]);
     const [orders, setOrders] = useState<Order[]>([]);
-    const [role, setRole] = useState<Role>('STAFF');
-    const [activeTab, setActiveTab] = useState('dashboard');
+
+    const [activeTab, setActiveTab] = useState('gallery');
     const [editingDesign, setEditingDesign] = useState<Design | null>(null);
     const [selectedDesign, setSelectedDesign] = useState<Design | null>(null);
     const [loading, setLoading] = useState(true);
+
+    const location = useLocation();
+    const navigate = useNavigate();
+
+    // Sync state with URL
+    useEffect(() => {
+        if (location.pathname.startsWith('/staffview')) {
+            if (activeTab === 'gallery' || activeTab === 'preview') {
+                setActiveTab('dashboard');
+            }
+        } else if (location.pathname.startsWith('/customerview')) {
+            if (activeTab !== 'gallery' && activeTab !== 'preview') {
+                setActiveTab('gallery');
+            }
+        }
+    }, [location.pathname]);
 
     const init = async () => {
         try {
@@ -39,8 +57,6 @@ function App() {
 
     const updateInventory = async (designId: string, category: string, size: string, newValue: number) => {
         let updatedDesign: Design | null = null;
-
-        // 1. Calculate the new state synchronously based on current 'designs'
         const newDesigns = designs.map(d => {
             if (d.id === designId) {
                 const cat = category as keyof Design['inventory'];
@@ -59,10 +75,8 @@ function App() {
             return d;
         });
 
-        // 2. Update React State
         if (updatedDesign) {
             setDesigns(newDesigns);
-            // 3. Sync to Database
             await syncDesign(updatedDesign);
         }
     };
@@ -99,25 +113,23 @@ function App() {
         setOrders(ordersData);
     };
 
+
+
+
+
     const handleAcceptOrder = async (order: Order) => {
-        // 1. Deduct Stock
         for (const [member, size] of Object.entries(order.selectedSizes)) {
             const category = member === 'Father' ? 'men' :
                 member === 'Mother' ? 'women' :
                     member === 'Son' ? 'boys' : 'girls';
 
-            // Find current stock
             const design = designs.find(d => d.id === order.designId);
             if (design) {
                 const currentStock = (design.inventory[category as keyof typeof design.inventory] as any)[size] || 0;
                 await updateInventory(order.designId, category, size, Math.max(0, currentStock - 1));
             }
         }
-
-        // 2. Update Order Status
         await updateOrderStatus(order.id, 'accepted');
-
-        // 3. Refresh Orders
         const ordersData = await fetchOrders();
         setOrders(ordersData);
         alert('Order accepted and stock deducted!');
@@ -131,13 +143,12 @@ function App() {
 
     if (loading) {
         return (
-            <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-main)' }}>
                 <div style={{ textAlign: 'center' }}>
-                    <div style={{
-                        width: '40px', height: '40px', border: '4px solid var(--glass-border)',
-                        borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin 1s linear infinite'
+                    <div className="spin" style={{
+                        width: '40px', height: '40px', border: '4px solid var(--border-subtle)',
+                        borderTopColor: 'var(--primary)', borderRadius: '50%'
                     }} />
-                    <style>{`@keyframes spin { 100% { transform: rotate(360deg); } }`}</style>
                     <p style={{ marginTop: '16px', color: 'var(--text-muted)' }}>Loading Combo Dress...</p>
                 </div>
             </div>
@@ -145,91 +156,89 @@ function App() {
     }
 
     return (
-        <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg-main)' }}>
             <Navigation
                 activeTab={activeTab}
                 setActiveTab={setActiveTab}
-                role={role}
-                setRole={setRole}
             />
 
             <main style={{ flexGrow: 1 }}>
-                {role === 'STAFF' ? (
-                    <>
-                        {(activeTab === 'dashboard' || activeTab === 'orders') && (
-                            <StaffDashboard
-                                designs={designs}
-                                orders={orders}
-                                updateInventory={updateInventory}
-                                deleteDesign={deleteDesign}
-                                viewMode={activeTab === 'orders' ? 'orders' : 'inventory'}
-                                setViewMode={(mode) => setActiveTab(mode === 'orders' ? 'orders' : 'dashboard')}
-                                onBack={() => {
-                                    if (activeTab === 'orders') {
+                <Routes>
+                    <Route path="/staffview" element={
+                        <>
+                            {(activeTab === 'dashboard' || activeTab === 'orders') && (
+                                <StaffDashboard
+                                    designs={designs}
+                                    orders={orders}
+                                    updateInventory={updateInventory}
+                                    deleteDesign={deleteDesign}
+                                    viewMode={activeTab === 'orders' ? 'orders' : 'inventory'}
+                                    setViewMode={(mode) => setActiveTab(mode === 'orders' ? 'orders' : 'dashboard')}
+                                    onBack={() => {
+                                        if (activeTab === 'orders') {
+                                            setActiveTab('dashboard');
+                                        } else {
+                                            navigate('/customerview');
+                                        }
+                                    }}
+                                    onEdit={(d) => {
+                                        setEditingDesign(d);
+                                        setActiveTab('manage');
+                                    }}
+                                    onAddNew={() => {
+                                        setEditingDesign(null);
+                                        setActiveTab('manage');
+                                    }}
+                                    onAcceptOrder={handleAcceptOrder}
+                                    onRejectOrder={handleRejectOrder}
+                                />
+                            )}
+                            {activeTab === 'manage' && (
+                                <DesignManager
+                                    editingDesign={editingDesign}
+                                    onSave={saveDesign}
+                                    onCancel={() => {
+                                        setEditingDesign(null);
                                         setActiveTab('dashboard');
-                                    } else {
-                                        setRole('CUSTOMER');
-                                        setActiveTab('gallery');
-                                    }
-                                }}
-                                onEdit={(d) => {
-                                    setEditingDesign(d);
-                                    setActiveTab('manage');
-                                }}
-                                onAddNew={() => {
-                                    setEditingDesign(null);
-                                    setActiveTab('manage');
-                                }}
-                                onAcceptOrder={handleAcceptOrder}
-                                onRejectOrder={handleRejectOrder}
-                            />
-                        )}
-                        {activeTab === 'manage' && (
-                            <DesignManager
-                                editingDesign={editingDesign}
-                                onSave={saveDesign}
-                                onCancel={() => {
-                                    setEditingDesign(null);
-                                    setActiveTab('dashboard');
-                                }}
-                            />
-                        )}
-                    </>
-                ) : (
-                    <>
-                        {activeTab === 'gallery' && (
-                            <CustomerGallery
-                                designs={designs}
-                                selectedDesign={selectedDesign}
-                                onBack={() => {
-                                    setRole('STAFF');
-                                    setActiveTab('dashboard');
-                                }}
-                                onSelect={(d) => {
-                                    setSelectedDesign(d);
-                                    setActiveTab('preview');
-                                }}
-                            />
-                        )}
-                        {activeTab === 'preview' && (
-                            <FamilyPreview
-                                design={selectedDesign}
-                                onPlaceOrder={handlePlaceOrder}
-                                onBack={() => setActiveTab('gallery')}
-                            />
-                        )}
-                    </>
-                )}
+                                    }}
+                                />
+                            )}
+                        </>
+                    } />
+                    <Route path="/customerview" element={
+                        <>
+                            {activeTab === 'gallery' && (
+                                <CustomerGallery
+                                    designs={designs}
+                                    selectedDesign={selectedDesign}
+                                    onSelect={(d) => {
+                                        setSelectedDesign(d);
+                                        setActiveTab('preview');
+                                    }}
+                                />
+                            )}
+                            {activeTab === 'preview' && (
+                                <FamilyPreview
+                                    design={selectedDesign}
+                                    onPlaceOrder={handlePlaceOrder}
+                                    onBack={() => setActiveTab('gallery')}
+                                />
+                            )}
+                        </>
+                    } />
+                    <Route path="*" element={<Navigate to="/customerview" replace />} />
+                </Routes>
             </main>
 
             <footer style={{
-                padding: '16px',
+                padding: '24px',
                 textAlign: 'center',
                 color: 'var(--text-muted)',
-                borderTop: '1px solid var(--glass-border)',
-                margin: '0 max(16px, 2vw) 24px max(16px, 2vw)'
+                borderTop: '1px solid var(--border-subtle)',
+                marginTop: 'auto',
+                fontSize: '0.9rem'
             }}>
-                © 2026 TailorPro Store • Local & Cloud Enabled
+                © 2026 Combodress.com • Developed by <a href="https://sirahdigital.in/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none' }}>Sirah Digital</a>
             </footer>
         </div>
     );

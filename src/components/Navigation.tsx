@@ -1,121 +1,72 @@
-import { LayoutDashboard, PlusCircle, Users, ShoppingBag, UserCheck } from 'lucide-react';
-import type { Role } from '../types';
+import React from 'react';
+import { Home, ShoppingBag, LayoutDashboard } from 'lucide-react';
+
 
 interface NavigationProps {
     activeTab: string;
     setActiveTab: (tab: string) => void;
-    role: Role;
-    setRole: (role: Role) => void;
 }
 
-const Navigation: React.FC<NavigationProps> = ({ activeTab, setActiveTab, role, setRole }) => {
-    const staffTabs = [
-        { id: 'dashboard', label: 'Ledger', icon: LayoutDashboard },
-        { id: 'orders', label: 'Orders', icon: ShoppingBag },
-        { id: 'manage', label: 'Edit', icon: PlusCircle },
-    ];
-
-    const customerTabs = [
-        { id: 'gallery', label: 'Gallery', icon: ShoppingBag },
-        { id: 'preview', label: 'Preview', icon: Users },
-    ];
-
-    const tabs = role === 'STAFF' ? staffTabs : customerTabs;
-
+const Navigation: React.FC<NavigationProps> = ({ activeTab, setActiveTab }) => {
     return (
-        <>
-            {/* Desktop/Tablet Navigation Header */}
-            <div className="glass-card tablet-up" style={{
-                margin: '24px',
-                padding: '12px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                position: 'sticky',
-                top: '24px',
-                zIndex: 100
-            }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ background: 'var(--primary)', padding: '8px', borderRadius: '10px', display: 'flex' }}>
-                        <ShoppingBag size={24} color="white" />
-                    </div>
-                    <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700 }}>Combo Dress</h2>
+        <nav style={{
+            padding: '16px max(16px, 2vw)',
+            background: 'var(--bg-main)',
+            borderBottom: '1px solid var(--border-subtle)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            position: 'sticky',
+            top: 0,
+            zIndex: 1000,
+            boxShadow: 'var(--shadow-sm)'
+        }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{
+                    width: '32px',
+                    height: '32px',
+                    background: 'var(--primary)',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'white'
+                }}>
+                    <Home size={18} />
                 </div>
-
-                <div style={{ display: 'flex', gap: '8px' }}>
-                    {tabs.map((tab) => (
-                        <button
-                            key={tab.id}
-                            onClick={() => setActiveTab(tab.id)}
-                            className={`btn ${activeTab === tab.id ? 'btn-primary' : 'btn-ghost'}`}
-                        >
-                            <tab.icon size={18} />
-                            <span>{tab.label}</span>
-                        </button>
-                    ))}
-                </div>
-
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <div style={{ height: '24px', width: '1px', background: 'var(--glass-border)', margin: '0 8px' }} />
-                    <button
-                        onClick={() => {
-                            const newRole = role === 'STAFF' ? 'CUSTOMER' : 'STAFF';
-                            setRole(newRole);
-                            setActiveTab(newRole === 'STAFF' ? 'dashboard' : 'gallery');
-                        }}
-                        className="btn btn-ghost"
-                        style={{ background: role === 'STAFF' ? 'rgba(99, 102, 241, 0.1)' : 'transparent' }}
-                    >
-                        {role === 'STAFF' ? <UserCheck size={18} color="var(--primary)" /> : <Users size={18} />}
-                        <span>{role === 'STAFF' ? 'Staff Mode' : 'Customer View'}</span>
-                    </button>
-                </div>
+                <h1 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, letterSpacing: '-0.02em' }}>
+                    ComboDress <span style={{ fontWeight: 400, opacity: 0.5 }}>Store</span>
+                </h1>
             </div>
 
-            {/* Mobile Header (minimal) */}
-            <div className="mobile-only" style={{
-                padding: '16px 20px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                background: 'rgba(15, 23, 42, 0.5)',
-                backdropFilter: 'blur(10px)',
-                position: 'sticky',
-                top: 0,
-                zIndex: 100,
-                borderBottom: '1px solid rgba(255,255,255,0.05)'
-            }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <ShoppingBag size={20} color="var(--primary)" />
-                    <span style={{ fontWeight: 800, fontSize: '0.9rem', letterSpacing: '0.03em' }}>COMBO DRESS</span>
-                </div>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 <button
-                    onClick={() => {
-                        const newRole = role === 'STAFF' ? 'CUSTOMER' : 'STAFF';
-                        setRole(newRole);
-                        setActiveTab(newRole === 'STAFF' ? 'dashboard' : 'gallery');
-                    }}
-                    style={{ background: 'none', border: 'none', color: 'var(--text-muted)' }}
+                    onClick={() => setActiveTab('gallery')}
+                    className={`btn ${activeTab === 'gallery' ? 'btn-primary' : 'btn-ghost'}`}
+                    style={{ gap: '6px', fontSize: '0.85rem' }}
                 >
-                    {role === 'STAFF' ? <UserCheck size={20} color="var(--primary)" /> : <Users size={20} />}
+                    <ShoppingBag size={16} />
+                    Gallery
+                </button>
+                <div style={{ width: '1px', height: '24px', background: 'var(--border-subtle)', margin: '0 8px' }} />
+                <button
+                    onClick={() => setActiveTab('dashboard')}
+                    className={`btn ${activeTab === 'dashboard' ? 'btn-primary' : 'btn-ghost'}`}
+                    style={{ gap: '6px', fontSize: '0.85rem' }}
+                >
+                    <LayoutDashboard size={16} />
+                    <span className="tablet-up">Inventory</span>
+                </button>
+                <button
+                    onClick={() => setActiveTab('orders')}
+                    className={`btn ${activeTab === 'orders' ? 'btn-primary' : 'btn-ghost'}`}
+                    style={{ gap: '6px', fontSize: '0.85rem' }}
+                >
+                    <ShoppingBag size={16} />
+                    <span className="tablet-up">Orders</span>
                 </button>
             </div>
-
-            {/* Mobile Bottom Navigation */}
-            <nav className="mobile-bottom-nav mobile-only">
-                {tabs.map((tab) => (
-                    <button
-                        key={tab.id}
-                        onClick={() => setActiveTab(tab.id)}
-                        className={`nav-item ${activeTab === tab.id ? 'active' : ''}`}
-                        style={{ background: 'none', border: 'none' }}
-                    >
-                        <tab.icon size={22} />
-                        <span>{tab.label}</span>
-                    </button>
-                ))}
-            </nav>
-        </>
+        </nav>
     );
 };
 

@@ -252,6 +252,41 @@ export const exportToCSV = (designs: Design[]) => {
     saveAs(blob, `tailor_inventory_${new Date().toISOString().split('T')[0]}.csv`);
 };
 
+const convertToJpegBlob = async (blob: Blob): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        const urlObject = URL.createObjectURL(blob);
+
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                reject(new Error('Canvas context failed'));
+                return;
+            }
+            // Fill white background for transparency
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0);
+
+            canvas.toBlob((newBlob) => {
+                URL.revokeObjectURL(urlObject);
+                if (newBlob) resolve(newBlob);
+                else reject(new Error('Canvas toBlob failed'));
+            }, 'image/jpeg', 0.9);
+        };
+
+        img.onerror = () => {
+            URL.revokeObjectURL(urlObject);
+            reject(new Error('Image load failed'));
+        };
+
+        img.src = urlObject;
+    });
+};
+
 export const exportImagesToZip = async (designs: Design[], onProgress?: (p: number) => void) => {
     const zip = new JSZip();
     const folder = zip.folder("design_images");
@@ -264,9 +299,12 @@ export const exportImagesToZip = async (designs: Design[], onProgress?: (p: numb
             const response = await fetch(design.imageUrl, { mode: 'cors' });
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const blob = await response.blob();
-            const extension = design.imageUrl.split('.').pop()?.split('?')[0] || 'jpg';
+
+            // Convert to JPEG
+            const jpegBlob = await convertToJpegBlob(blob);
+
             const safeName = design.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-            folder?.file(`${safeName}_${design.id.slice(-4)}.${extension}`, blob);
+            folder?.file(`${safeName}_${design.id.slice(-4)}.jpg`, jpegBlob);
         } catch (error) {
             console.error(`Failed to download image for ${design.name}:`, error);
         }
@@ -283,8 +321,11 @@ export const downloadSingleImage = async (url: string, name: string) => {
         const response = await fetch(url, { mode: 'cors' });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const blob = await response.blob();
-        const extension = url.split('.').pop()?.split('?')[0] || 'jpg';
-        saveAs(blob, `${name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.${extension}`);
+
+        // Convert to JPEG
+        const jpegBlob = await convertToJpegBlob(blob);
+
+        saveAs(jpegBlob, `${name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.jpg`);
     } catch (error) {
         console.error('Download failure:', error);
         alert('Failed to download image. Ensure CORS is configured in your storage settings.');

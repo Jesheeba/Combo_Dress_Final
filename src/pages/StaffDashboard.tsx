@@ -84,12 +84,13 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({
                 width: '100%',
                 background: 'none',
                 border: 'none',
-                color: value === 0 ? 'rgba(255,255,255,0.1)' : 'white',
+                color: value === 0 ? 'var(--text-muted)' : 'var(--text-main)',
+                opacity: value === 0 ? 0.3 : 1,
                 textAlign: 'center',
                 fontSize: '0.9rem',
                 padding: '8px 0',
                 outline: 'none',
-                transition: 'background 0.2s'
+                transition: 'all 0.2s'
             }}
         />
     );
@@ -142,10 +143,10 @@ Status: ${order.status.toUpperCase()}
                 justifyContent: 'space-between',
                 alignItems: 'center',
                 marginBottom: '24px',
-                background: 'rgba(255,255,255,0.02)',
-                padding: '16px',
+                background: 'var(--bg-secondary)',
+                padding: '20px',
                 borderRadius: '16px',
-                border: '1px solid var(--glass-border)',
+                border: '1px solid var(--border-subtle)',
                 flexWrap: 'wrap',
                 gap: '16px'
             }}>
@@ -235,10 +236,10 @@ Status: ${order.status.toUpperCase()}
                                 alignItems: 'center',
                                 gap: '12px',
                                 cursor: 'pointer',
-                                border: (stat.id === analyticsFilter && stat.id !== 'all') ? `2px solid ${stat.color}` : '1px solid var(--glass-border)',
+                                border: (stat.id === analyticsFilter && stat.id !== 'all') ? `2px solid ${stat.color}` : '1px solid var(--border-subtle)',
                                 transform: (stat.id === analyticsFilter && stat.id !== 'all') ? 'scale(1.02)' : 'none',
                                 transition: 'all 0.2s ease',
-                                background: (stat.id === analyticsFilter && stat.id !== 'all') ? `${stat.color}05` : 'rgba(255,255,255,0.03)'
+                                background: (stat.id === analyticsFilter && stat.id !== 'all') ? `${stat.color}05` : 'var(--bg-secondary)'
                             }}
                             onClick={() => {
                                 if (stat.id === 'orders') {
@@ -276,11 +277,11 @@ Status: ${order.status.toUpperCase()}
             {viewMode === 'inventory' ? (
                 <>
                     {/* Desktop Table View */}
-                    <div className="glass-card tablet-up" style={{ overflow: 'hidden', border: '1px solid var(--glass-border)' }}>
+                    <div className="glass-card tablet-up" style={{ overflow: 'hidden', border: '1px solid var(--border-subtle)' }}>
                         <div style={{ overflowX: 'auto' }}>
                             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                                 <thead>
-                                    <tr style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+                                    <tr style={{ background: 'var(--bg-secondary)', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
                                         <th style={{ padding: '12px 16px', width: '60px' }}>Swatch</th>
                                         <th style={{ padding: '12px 16px', minWidth: '150px' }}>Design Name</th>
                                         <th style={{ padding: '12px 16px', width: '100px' }}>Category</th>
@@ -294,7 +295,7 @@ Status: ${order.status.toUpperCase()}
                                         <React.Fragment key={design.id}>
                                             {(['men', 'women', 'boys', 'girls'] as const).map((cat, idx) => (
                                                 <tr key={`${design.id}-${cat}`} style={{
-                                                    borderBottom: idx === 3 ? '2px solid rgba(255,255,255,0.1)' : '1px solid rgba(255,255,255,0.03)',
+                                                    borderBottom: idx === 3 ? '2px solid var(--border-subtle)' : '1px solid var(--border-subtle)',
                                                     transition: 'background 0.2s'
                                                 }}>
                                                     {idx === 0 && (
@@ -378,13 +379,14 @@ Status: ${order.status.toUpperCase()}
                                 </div>
 
                                 {(['men', 'women', 'boys', 'girls'] as const).map(cat => (
-                                    <div key={cat} style={{ marginBottom: '12px', padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px' }}>
-                                        <h4 style={{ margin: '0 0 8px 0', fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--primary)' }}>{cat} Inventory</h4>
+                                    <div key={cat} style={{ marginBottom: '12px', padding: '12px', background: 'var(--bg-secondary)', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
+                                        <h4 style={{ margin: '0 0 8px 0', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--primary)', fontWeight: 700 }}>{cat} Inventory</h4>
                                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: '8px' }}>
                                             {((cat === 'men' || cat === 'women') ? adultSizes : kidsSizes).map(size => (
                                                 <div key={size} style={{
                                                     padding: '8px',
-                                                    background: 'rgba(255,255,255,0.03)',
+                                                    background: 'var(--bg-main)',
+                                                    border: '1px solid var(--border-subtle)',
                                                     borderRadius: '6px',
                                                     display: 'flex',
                                                     flexDirection: 'column',
@@ -425,7 +427,7 @@ Status: ${order.status.toUpperCase()}
                         </div>
                     ) : (
                         pendingOrders.map(order => (
-                            <div key={order.id} className="glass-card" style={{ padding: 'max(16px, 3vw)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px' }}>
+                            <div key={order.id} className="glass-card" style={{ padding: 'max(16px, 3vw)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px', border: '1px solid var(--border-subtle)' }}>
                                 <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
                                     <div style={{ background: 'var(--primary)', color: 'white', padding: '10px', borderRadius: '12px', flexShrink: 0 }}>
                                         <ShoppingBag size={20} />
