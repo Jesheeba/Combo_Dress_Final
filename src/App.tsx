@@ -245,7 +245,7 @@ function App() {
                 setActiveTab={setActiveTab}
             />
 
-            <main style={{ flexGrow: 1 }}>
+            <main style={{ flexGrow: 1, overflowY: 'auto' }}>
                 <Routes>
                     <Route path="/staffview" element={
                         <>
