@@ -90,18 +90,20 @@ const CustomerGallery: React.FC<CustomerGalleryProps> = ({ designs, onSelect, se
                 if (['boys', 'girls', 'unisex'].includes(activeFilter)) {
                     const cf = activeFilter as 'boys' | 'girls' | 'unisex';
                     if (cf === 'unisex') {
-                        if (design.childType !== 'unisex') {
-                            const hasBoys = Object.values(design.inventory.boys).some(s => s > 0);
-                            const hasGirls = Object.values(design.inventory.girls).some(s => s > 0);
-                            if (!(hasBoys && hasGirls)) passesCategory = false;
+                        // For unisex, we look for designs specifically labeled unisex
+                        // OR designs that have available stock for BOTH boys and girls
+                        const hasBoys = Object.values(design.inventory.boys).some(s => s > 0);
+                        const hasGirls = Object.values(design.inventory.girls).some(s => s > 0);
+
+                        if (design.childType !== 'unisex' && !(hasBoys && hasGirls)) {
+                            passesCategory = false;
                         }
                     } else {
-                        if (design.childType && design.childType !== cf && design.childType !== 'unisex') passesCategory = false;
-                        else {
-                            const inventory = design.inventory[cf as keyof Design['inventory']];
-                            const hasStock = Object.values(inventory).some(stock => stock > 0);
-                            if (!hasStock) passesCategory = false;
-                        }
+                        // For Boys or Girls specifically:
+                        // Ignore the label! Just check if there is stock.
+                        const inventory = design.inventory[cf as keyof Design['inventory']];
+                        const hasStock = Object.values(inventory).some(stock => stock > 0);
+                        if (!hasStock) passesCategory = false;
                     }
                 } else {
                     const members = comboMembers[activeFilter as ComboType];

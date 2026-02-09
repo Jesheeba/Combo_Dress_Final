@@ -1,6 +1,6 @@
 import React from 'react';
 import { useLocation } from 'react-router-dom';
-import { Home, ShoppingBag, LayoutDashboard } from 'lucide-react';
+import { ShoppingBag, LayoutDashboard } from 'lucide-react';
 
 
 interface NavigationProps {
@@ -27,16 +27,14 @@ const Navigation: React.FC<NavigationProps> = ({ activeTab, setActiveTab }) => {
         }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <div style={{
-                    width: '32px',
-                    height: '32px',
-                    background: 'var(--primary)',
-                    borderRadius: '8px',
+                    width: '40px',
+                    height: '40px',
+                    overflow: 'hidden',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center',
-                    color: 'white'
+                    justifyContent: 'center'
                 }}>
-                    <Home size={18} />
+                    <img src="/logo.png" alt="ComboDress Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                 </div>
                 <h1 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, letterSpacing: '-0.02em' }}>
                     ComboDress <span style={{ fontWeight: 400, opacity: 0.5 }}>Store</span>

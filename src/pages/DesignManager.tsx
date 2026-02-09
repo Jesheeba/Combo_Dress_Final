@@ -25,6 +25,7 @@ const DesignManager: React.FC<DesignManagerProps> = ({ onSave, editingDesign: pr
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isUploading, setIsUploading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
     const [formData, setFormData] = useState<Partial<Design>>({
         name: '',
         color: '',
@@ -50,11 +51,12 @@ const DesignManager: React.FC<DesignManagerProps> = ({ onSave, editingDesign: pr
         if (!file) return;
 
         setIsUploading(true);
+        setError(null);
         try {
             const url = await uploadImage(file);
             setFormData(prev => ({ ...prev, imageUrl: url }));
         } catch (error) {
-            alert('Failed to upload image. Please check your storage configuration.');
+            setError('Failed to upload image. Please check your storage configuration.');
         } finally {
             setIsUploading(false);
         }
@@ -62,8 +64,9 @@ const DesignManager: React.FC<DesignManagerProps> = ({ onSave, editingDesign: pr
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setError(null);
         if (!formData.imageUrl) {
-            alert('Please upload an image first.');
+            setError('Please upload an image first.');
             return;
         }
         await onSave(formData);
@@ -141,58 +144,66 @@ const DesignManager: React.FC<DesignManagerProps> = ({ onSave, editingDesign: pr
                     </div>
                 </div>
 
-                {/* Details Section */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-                    <label style={{ display: 'block', fontWeight: 600, fontSize: '0.9rem', textTransform: 'uppercase', color: 'var(--text-muted)' }}>2. Details</label>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                        <div>
-                            <label className="label">Product Name</label>
-                            <input required className="input" placeholder="e.g. Royal Heritage Print" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
-                        </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                            <div>
-                                <label className="label">Color Theme</label>
-                                <input required className="input" placeholder="e.g. Navy Blue" value={formData.color} onChange={(e) => setFormData({ ...formData, color: e.target.value })} />
-                            </div>
-                            <div>
-                                <label className="label">Fabric</label>
-                                <input required className="input" placeholder="e.g. Crepe Silk" value={formData.fabric} onChange={(e) => setFormData({ ...formData, fabric: e.target.value })} />
-                            </div>
-                        </div>
-                        <div>
-                            <label className="label">Category</label>
-                            <select className="input" value={formData.childType || 'none'} onChange={(e) => setFormData({ ...formData, childType: e.target.value as any })}>
-                                <option value="none">Adult Collection</option>
-                                <option value="boys">Boys</option>
-                                <option value="girls">Girls</option>
-                                <option value="unisex">Unisex Kids</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="label">Marketing Label</label>
-                            <input className="input" placeholder="e.g. LIMITED EDITION" value={formData.label || ''} onChange={(e) => setFormData({ ...formData, label: e.target.value })} />
-                        </div>
-                    </div>
+        </div>
 
-                    <div style={{ marginTop: 'auto', background: 'var(--bg-secondary)', padding: '24px', borderRadius: '20px', border: '1px solid var(--border-subtle)' }}>
-                        <h4 style={{ margin: '0 0 8px 0', fontSize: '1rem' }}>Registry Note</h4>
-                        <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                            New designs are registered with zero inventory. You can manage stock levels in the Dashboard Ledger after saving.
-                        </p>
-                    </div>
-
-                    <button type="submit" className="btn btn-primary" style={{ height: '56px', fontSize: '1.1rem' }} disabled={isUploading}>
-                        <Save size={20} />
-                        {editingDesign ? 'Update Collection' : 'Register Collection'}
-                    </button>
+                {/* Details Section */ }
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+        <label style={{ display: 'block', fontWeight: 600, fontSize: '0.9rem', textTransform: 'uppercase', color: 'var(--text-muted)' }}>2. Details</label>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div>
+                <label className="label">Product Name</label>
+                <input required className="input" placeholder="e.g. Royal Heritage Print" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div>
+                    <label className="label">Color Theme</label>
+                    <input required className="input" placeholder="e.g. Navy Blue" value={formData.color} onChange={(e) => setFormData({ ...formData, color: e.target.value })} />
                 </div>
-            </form>
-            <style>{`
+                <div>
+                    <label className="label">Fabric</label>
+                    <input required className="input" placeholder="e.g. Crepe Silk" value={formData.fabric} onChange={(e) => setFormData({ ...formData, fabric: e.target.value })} />
+                </div>
+            </div>
+            <div>
+                <label className="label">Category</label>
+                <select className="input" value={formData.childType || 'none'} onChange={(e) => setFormData({ ...formData, childType: e.target.value as any })}>
+                    <option value="none">Adult Collection</option>
+                    <option value="boys">Boys</option>
+                    <option value="girls">Girls</option>
+                    <option value="unisex">Unisex Kids</option>
+                </select>
+            </div>
+            <div>
+                <label className="label">Marketing Label</label>
+                <input className="input" placeholder="e.g. LIMITED EDITION" value={formData.label || ''} onChange={(e) => setFormData({ ...formData, label: e.target.value })} />
+            </div>
+        </div>
+
+        <div style={{ marginTop: 'auto', background: 'var(--bg-secondary)', padding: '24px', borderRadius: '20px', border: '1px solid var(--border-subtle)' }}>
+            <h4 style={{ margin: '0 0 8px 0', fontSize: '1rem' }}>Registry Note</h4>
+            <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                New designs are registered with zero inventory. You can manage stock levels in the Dashboard Ledger after saving.
+            </p>
+        </div>
+
+        {error && (
+            <div style={{ padding: '12px', background: '#fee2e2', color: '#dc2626', borderRadius: '8px', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontWeight: 'bold' }}>!</span> {error}
+            </div>
+        )}
+
+        <button type="submit" className="btn btn-primary" style={{ height: '56px', fontSize: '1.1rem' }} disabled={isUploading}>
+            <Save size={20} />
+            {editingDesign ? 'Update Collection' : 'Register Collection'}
+        </button>
+    </div>
+            </form >
+    <style>{`
                 .label { display: block; margin-bottom: 8px; font-size: 0.8rem; font-weight: 700; color: var(--text-main); }
                 .spin { animation: spin 1s linear infinite; }
                 @keyframes spin { 100% { transform: rotate(360deg); } }
             `}</style>
-        </div>
+        </div >
     );
 };
 

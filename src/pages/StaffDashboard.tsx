@@ -27,6 +27,7 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({
     const [analyticsFilter, setAnalyticsFilter] = useState<'all' | 'low-stock'>('all');
     const [isExportingImages, setIsExportingImages] = useState(false);
     const [exportProgress, setExportProgress] = useState(0);
+    const [deleteId, setDeleteId] = useState<string | null>(null);
 
     const filteredDesigns = designs.filter(design => {
         const matchesSearch =
@@ -379,7 +380,7 @@ Status: ${order.status.toUpperCase()}
                                                                 <button onClick={() => onEdit(design)} className="btn btn-ghost" style={{ padding: '6px' }} title="Edit Details">
                                                                     <Edit2 size={14} />
                                                                 </button>
-                                                                <button onClick={() => deleteDesign(design.id)} className="btn btn-ghost" style={{ padding: '6px', color: 'var(--danger)' }} title="Delete Design">
+                                                                <button onClick={() => setDeleteId(design.id)} className="btn btn-ghost" style={{ padding: '6px', color: 'var(--danger)' }} title="Delete Design">
                                                                     <Trash2 size={14} />
                                                                 </button>
                                                             </div>
@@ -438,7 +439,7 @@ Status: ${order.status.toUpperCase()}
                                     <button onClick={() => onEdit(design)} className="btn btn-ghost" style={{ flexGrow: 1, justifyContent: 'center' }}>
                                         <Edit2 size={16} /> Edit
                                     </button>
-                                    <button onClick={() => deleteDesign(design.id)} className="btn btn-ghost" style={{ color: 'var(--danger)', flexGrow: 1, justifyContent: 'center' }}>
+                                    <button onClick={() => setDeleteId(design.id)} className="btn btn-ghost" style={{ color: 'var(--danger)', flexGrow: 1, justifyContent: 'center' }}>
                                         <Trash2 size={16} /> Delete
                                     </button>
                                 </div>
@@ -592,7 +593,7 @@ Status: ${order.status.toUpperCase()}
                                         <Edit2 size={16} /> Edit
                                     </button>
                                     <button
-                                        onClick={() => deleteDesign(design.id)}
+                                        onClick={() => setDeleteId(design.id)}
                                         className="btn btn-ghost"
                                         style={{ color: 'var(--danger)', padding: '8px' }}
                                         title="Delete"
@@ -617,6 +618,42 @@ Status: ${order.status.toUpperCase()}
                 <button onClick={onAddNew} className="fab mobile-only">
                     <Plus size={28} />
                 </button>
+            )}
+
+            {/* Custom Confirmation Modal */}
+            {deleteId && (
+                <div style={{
+                    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'
+                }}>
+                    <div style={{
+                        background: 'var(--bg-main)', padding: '24px', borderRadius: '16px',
+                        maxWidth: '400px', width: '100%', boxShadow: 'var(--shadow-lg)'
+                    }}>
+                        <h3 style={{ margin: '0 0 12px 0', fontSize: '1.2rem' }}>Confirm Deletion</h3>
+                        <p style={{ color: 'var(--text-muted)', marginBottom: '24px', lineHeight: '1.5' }}>
+                            Are you sure you want to delete this design? This action cannot be undone.
+                        </p>
+                        <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                            <button
+                                onClick={() => setDeleteId(null)}
+                                className="btn btn-ghost"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => {
+                                    if (deleteId) deleteDesign(deleteId);
+                                    setDeleteId(null);
+                                }}
+                                className="btn btn-primary"
+                                style={{ background: 'var(--danger)', borderColor: 'var(--danger)' }}
+                            >
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
 
             <style>{`

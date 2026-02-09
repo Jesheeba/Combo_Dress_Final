@@ -28,12 +28,7 @@ const FamilyPreview: React.FC<FamilyPreviewProps> = ({ design, category = 'ALL',
 
         let effectiveCategory = category;
 
-        // Infer category from design if generic 'ALL' is used
-        if (effectiveCategory === 'ALL' && design) {
-            if (design.childType === 'boys') effectiveCategory = 'boys';
-            else if (design.childType === 'girls') effectiveCategory = 'girls';
-            else if (design.childType === 'unisex') effectiveCategory = 'unisex';
-        }
+
 
         if (effectiveCategory === 'ALL') return true;
 
@@ -188,7 +183,7 @@ const FamilyPreview: React.FC<FamilyPreviewProps> = ({ design, category = 'ALL',
                 <ArrowLeft size={18} />
                 Back to Gallery
             </button>
-            
+
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))', gap: '32px' }}>
 
                 {/* Visual Section */}
@@ -237,7 +232,20 @@ const FamilyPreview: React.FC<FamilyPreviewProps> = ({ design, category = 'ALL',
                                         onChange={(e) => setFatherSize(e.target.value)}
                                     >
                                         <option value="N/A">None</option>
-                                        {['M', 'L', 'XL', 'XXL', '3XL'].map(s => <option key={s} value={s}>{s}</option>)}
+                                        {['M', 'L', 'XL', 'XXL', '3XL'].map(s => {
+                                            const stock = design.inventory.men[s as keyof typeof design.inventory.men];
+                                            const isAvailable = stock > 0;
+                                            return (
+                                                <option
+                                                    key={s}
+                                                    value={s}
+                                                    disabled={!isAvailable}
+                                                    style={!isAvailable ? { color: '#bbb' } : {}}
+                                                >
+                                                    {s}{!isAvailable ? ' ✕' : ''}
+                                                </option>
+                                            );
+                                        })}
                                     </select>
                                 </div>
                             )}
@@ -252,7 +260,20 @@ const FamilyPreview: React.FC<FamilyPreviewProps> = ({ design, category = 'ALL',
                                         onChange={(e) => setMotherSize(e.target.value)}
                                     >
                                         <option value="N/A">None</option>
-                                        {['M', 'L', 'XL', 'XXL', '3XL'].map(s => <option key={s} value={s}>{s}</option>)}
+                                        {['M', 'L', 'XL', 'XXL', '3XL'].map(s => {
+                                            const stock = design.inventory.women[s as keyof typeof design.inventory.women];
+                                            const isAvailable = stock > 0;
+                                            return (
+                                                <option
+                                                    key={s}
+                                                    value={s}
+                                                    disabled={!isAvailable}
+                                                    style={!isAvailable ? { color: '#bbb' } : {}}
+                                                >
+                                                    {s}{!isAvailable ? ' ✕' : ''}
+                                                </option>
+                                            );
+                                        })}
                                     </select>
                                 </div>
                             )}
@@ -270,7 +291,20 @@ const FamilyPreview: React.FC<FamilyPreviewProps> = ({ design, category = 'ALL',
                                                     onChange={(e) => updateSonSize(son.id, e.target.value)}
                                                 >
                                                     <option value="N/A">None</option>
-                                                    {['0-1', '1-2', '2-3', '3-4', '4-5', '5-6', '6-7', '7-8', '9-10', '11-12', '13-14'].map(s => <option key={s} value={s}>{s}</option>)}
+                                                    {['0-1', '1-2', '2-3', '3-4', '4-5', '5-6', '6-7', '7-8', '9-10', '11-12', '13-14'].map(s => {
+                                                        const stock = design.inventory.boys[s as keyof typeof design.inventory.boys];
+                                                        const isAvailable = stock > 0;
+                                                        return (
+                                                            <option
+                                                                key={s}
+                                                                value={s}
+                                                                disabled={!isAvailable}
+                                                                style={!isAvailable ? { color: '#bbb' } : {}}
+                                                            >
+                                                                {s}{!isAvailable ? ' ✕' : ''}
+                                                            </option>
+                                                        );
+                                                    })}
                                                 </select>
                                                 {sons.length > 1 && (
                                                     <button onClick={() => removeSon(son.id)} style={{ color: 'red', background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}>✕</button>
@@ -301,7 +335,20 @@ const FamilyPreview: React.FC<FamilyPreviewProps> = ({ design, category = 'ALL',
                                                     onChange={(e) => updateDaughterSize(daughter.id, e.target.value)}
                                                 >
                                                     <option value="N/A">None</option>
-                                                    {['0-1', '1-2', '2-3', '3-4', '4-5', '5-6', '6-7', '7-8', '9-10', '11-12', '13-14'].map(s => <option key={s} value={s}>{s}</option>)}
+                                                    {['0-1', '1-2', '2-3', '3-4', '4-5', '5-6', '6-7', '7-8', '9-10', '11-12', '13-14'].map(s => {
+                                                        const stock = design.inventory.girls[s as keyof typeof design.inventory.girls];
+                                                        const isAvailable = stock > 0;
+                                                        return (
+                                                            <option
+                                                                key={s}
+                                                                value={s}
+                                                                disabled={!isAvailable}
+                                                                style={!isAvailable ? { color: '#bbb' } : {}}
+                                                            >
+                                                                {s}{!isAvailable ? ' ✕' : ''}
+                                                            </option>
+                                                        );
+                                                    })}
                                                 </select>
                                                 {daughters.length > 1 && (
                                                     <button onClick={() => removeDaughter(daughter.id)} style={{ color: 'red', background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}>✕</button>

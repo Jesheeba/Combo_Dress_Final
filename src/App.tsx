@@ -88,7 +88,11 @@ function App() {
             });
 
             if (payload.eventType === 'INSERT') {
-                setDesigns(prev => [mapDesign(payload.new), ...prev]);
+                const newDesign = mapDesign(payload.new);
+                setDesigns(prev => {
+                    if (prev.some(d => d.id === newDesign.id)) return prev;
+                    return [newDesign, ...prev];
+                });
             } else if (payload.eventType === 'UPDATE') {
                 setDesigns(prev => prev.map(d => d.id === payload.new.id ? mapDesign(payload.new) : d));
             } else if (payload.eventType === 'DELETE') {
@@ -130,10 +134,8 @@ function App() {
     };
 
     const deleteDesign = async (id: string) => {
-        if (window.confirm('Are you sure you want to delete this design?')) {
-            setDesigns(prev => prev.filter(d => d.id !== id));
-            await removeDesign(id);
-        }
+        setDesigns(prev => prev.filter(d => d.id !== id));
+        await removeDesign(id);
     };
 
     const saveDesign = async (designData: Partial<Design>) => {
