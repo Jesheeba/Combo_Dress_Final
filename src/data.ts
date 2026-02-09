@@ -403,3 +403,86 @@ export const downloadSingleImage = async (url: string, name: string) => {
     }
 };
 
+// --- TEMPORARY INVENTORY CONTROL ---
+
+export const getSessionId = () => {
+    let sessionId = localStorage.getItem('tailor_shop_session_id');
+    if (!sessionId) {
+        sessionId = crypto.randomUUID();
+        localStorage.setItem('tailor_shop_session_id', sessionId);
+    }
+    return sessionId;
+};
+
+export const getAvailableStock = async (designId: string, category: string, size: string): Promise<number> => {
+    if (!isSupabaseConfigured) return 999; // Fallback for local mode
+
+    const { data, error } = await supabase
+        .rpc('get_available_stock', {
+            p_design_id: designId,
+            p_category: category,
+            p_size: size
+        });
+
+    if (error) {
+        console.error('Error fetching available stock:', error);
+        return 0;
+    }
+    return data as number;
+};
+
+export const reserveStock = async (designId: string, category: string, size: string, quantity: number): Promise<boolean> => {
+    if (!isSupabaseConfigured) return true; // Always succeed in local mode
+
+    const sessionId = getSessionId();
+    const { data, error } = await supabase
+        .rpc('reserve_stock', {
+            p_design_id: designId,
+            p_category: category,
+            p_size: size,
+            p_quantity: quantity,
+            p_session_id: sessionId
+        });
+
+    if (error) {
+        console.error('Error reserving stock:', error);
+        return false;
+    }
+    return data as boolean;
+};
+
+export const linkHoldsToOrder = async (orderId: string) => {
+    if (!isSupabaseConfigured) return;
+
+    const sessionId = getSessionId();
+    const { error } = await supabase
+        .rpc('link_holds_to_order', {
+            p_session_id: sessionId,
+            p_order_id: orderId
+        });
+
+    if (error) console.error('Error linking holds:', error);
+};
+
+export const commitStock = async (orderId: string) => {
+    if (!isSupabaseConfigured) return;
+
+    const { error } = await supabase
+        .rpc('commit_stock_for_order', {
+            p_order_id: orderId
+        });
+
+    if (error) console.error('Error committing stock:', error);
+};
+
+export const releaseStock = async (orderId: string) => {
+    if (!isSupabaseConfigured) return;
+
+    const { error } = await supabase
+        .rpc('release_stock_for_order', {
+            p_order_id: orderId
+        });
+
+    if (error) console.error('Error releasing stock:', error);
+};
+

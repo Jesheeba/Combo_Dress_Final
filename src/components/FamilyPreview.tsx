@@ -160,6 +160,33 @@ const FamilyPreview: React.FC<FamilyPreviewProps> = ({ design, category = 'ALL',
         }
     };
 
+    // --- Frontend Stock Logic ---
+    const getUsedCount = (category: string, size: string) => {
+        let count = 0;
+        if (category === 'men' && fatherSize === size) count++;
+        if (category === 'women' && motherSize === size) count++;
+        if (category === 'boys') sons.forEach(s => { if (s.size === size) count++; });
+        if (category === 'girls') daughters.forEach(d => { if (d.size === size) count++; });
+        return count;
+    };
+
+    const isSizeAvailable = (category: keyof Design['inventory'], size: string, currentSelection: string) => {
+        if (!design) return false;
+        const totalStock = design.inventory[category][size as keyof (typeof design.inventory)[typeof category]];
+        const used = getUsedCount(category, size);
+
+        // If the current dropdown currently HAS this size selected, 
+        // we effectively "free it up" for the calculation to see if it's *still* available (which it is, for itself).
+        // Or simpler: Remaining = Total - Used. If I have it, Used includes me.
+        // So Available for ME = Total - (Used - 1) = Total - Used + 1
+        // If I don't have it, Available for ME = Total - Used.
+
+        const myContribution = currentSelection === size ? 1 : 0;
+        const remaining = totalStock - (used - myContribution);
+        return remaining > 0;
+    };
+
+
     const handleCloseModal = () => {
         setShowOrderForm(false);
         setOrderSuccess(false);
@@ -234,15 +261,19 @@ const FamilyPreview: React.FC<FamilyPreviewProps> = ({ design, category = 'ALL',
                                         <option value="N/A">None</option>
                                         {['M', 'L', 'XL', 'XXL', '3XL'].map(s => {
                                             const stock = design.inventory.men[s as keyof typeof design.inventory.men];
-                                            const isAvailable = stock > 0;
+                                            const isStockPositive = stock > 0;
+                                            const availableForMe = isSizeAvailable('men', s, fatherSize);
+                                            // Disabled if: No Base Stock OR (Base Stock exists but fully consumed by others)
+                                            const isDisabled = !isStockPositive || !availableForMe;
+
                                             return (
                                                 <option
                                                     key={s}
                                                     value={s}
-                                                    disabled={!isAvailable}
-                                                    style={!isAvailable ? { color: '#bbb' } : {}}
+                                                    disabled={isDisabled}
+                                                    style={isDisabled ? { color: '#bbb' } : {}}
                                                 >
-                                                    {s}{!isAvailable ? ' ✕' : ''}
+                                                    {s}{isDisabled && isStockPositive ? ' (Sold Out)' : !isStockPositive ? ' ✕' : ''}
                                                 </option>
                                             );
                                         })}
@@ -262,15 +293,18 @@ const FamilyPreview: React.FC<FamilyPreviewProps> = ({ design, category = 'ALL',
                                         <option value="N/A">None</option>
                                         {['M', 'L', 'XL', 'XXL', '3XL'].map(s => {
                                             const stock = design.inventory.women[s as keyof typeof design.inventory.women];
-                                            const isAvailable = stock > 0;
+                                            const isStockPositive = stock > 0;
+                                            const availableForMe = isSizeAvailable('women', s, motherSize);
+                                            const isDisabled = !isStockPositive || !availableForMe;
+
                                             return (
                                                 <option
                                                     key={s}
                                                     value={s}
-                                                    disabled={!isAvailable}
-                                                    style={!isAvailable ? { color: '#bbb' } : {}}
+                                                    disabled={isDisabled}
+                                                    style={isDisabled ? { color: '#bbb' } : {}}
                                                 >
-                                                    {s}{!isAvailable ? ' ✕' : ''}
+                                                    {s}{isDisabled && isStockPositive ? ' (Sold Out)' : !isStockPositive ? ' ✕' : ''}
                                                 </option>
                                             );
                                         })}
@@ -293,15 +327,18 @@ const FamilyPreview: React.FC<FamilyPreviewProps> = ({ design, category = 'ALL',
                                                     <option value="N/A">None</option>
                                                     {['0-1', '1-2', '2-3', '3-4', '4-5', '5-6', '6-7', '7-8', '9-10', '11-12', '13-14'].map(s => {
                                                         const stock = design.inventory.boys[s as keyof typeof design.inventory.boys];
-                                                        const isAvailable = stock > 0;
+                                                        const isStockPositive = stock > 0;
+                                                        const availableForMe = isSizeAvailable('boys', s, son.size);
+                                                        const isDisabled = !isStockPositive || !availableForMe;
+
                                                         return (
                                                             <option
                                                                 key={s}
                                                                 value={s}
-                                                                disabled={!isAvailable}
-                                                                style={!isAvailable ? { color: '#bbb' } : {}}
+                                                                disabled={isDisabled}
+                                                                style={isDisabled ? { color: '#bbb' } : {}}
                                                             >
-                                                                {s}{!isAvailable ? ' ✕' : ''}
+                                                                {s}{isDisabled && isStockPositive ? ' (Sold Out)' : !isStockPositive ? ' ✕' : ''}
                                                             </option>
                                                         );
                                                     })}
@@ -337,15 +374,18 @@ const FamilyPreview: React.FC<FamilyPreviewProps> = ({ design, category = 'ALL',
                                                     <option value="N/A">None</option>
                                                     {['0-1', '1-2', '2-3', '3-4', '4-5', '5-6', '6-7', '7-8', '9-10', '11-12', '13-14'].map(s => {
                                                         const stock = design.inventory.girls[s as keyof typeof design.inventory.girls];
-                                                        const isAvailable = stock > 0;
+                                                        const isStockPositive = stock > 0;
+                                                        const availableForMe = isSizeAvailable('girls', s, daughter.size);
+                                                        const isDisabled = !isStockPositive || !availableForMe;
+
                                                         return (
                                                             <option
                                                                 key={s}
                                                                 value={s}
-                                                                disabled={!isAvailable}
-                                                                style={!isAvailable ? { color: '#bbb' } : {}}
+                                                                disabled={isDisabled}
+                                                                style={isDisabled ? { color: '#bbb' } : {}}
                                                             >
-                                                                {s}{!isAvailable ? ' ✕' : ''}
+                                                                {s}{isDisabled && isStockPositive ? ' (Sold Out)' : !isStockPositive ? ' ✕' : ''}
                                                             </option>
                                                         );
                                                     })}
@@ -369,18 +409,50 @@ const FamilyPreview: React.FC<FamilyPreviewProps> = ({ design, category = 'ALL',
                     </section>
 
                     <button
-                        onClick={() => {
+                        onClick={async () => {
                             if (!validateSelection()) {
                                 setShowValidationError(true);
                                 return;
                             }
-                            setShowOrderForm(true);
+
+                            // Reserve Stock Logic
+                            setIsSubmitting(true);
+                            // We need to check all selected items
+                            const itemsToReserve: { category: string, size: string }[] = [];
+
+                            if (fatherSize !== 'N/A') itemsToReserve.push({ category: 'men', size: fatherSize });
+                            if (motherSize !== 'N/A') itemsToReserve.push({ category: 'women', size: motherSize });
+                            sons.forEach(s => { if (s.size !== 'N/A') itemsToReserve.push({ category: 'boys', size: s.size }); });
+                            daughters.forEach(d => { if (d.size !== 'N/A') itemsToReserve.push({ category: 'girls', size: d.size }); });
+
+                            try {
+                                const { reserveStock } = await import('../data');
+                                // Sequentially reserve to avoid race/deadlocks or complex rollback for now
+                                // In production, one atomic batch RPC is better, but loop is fine here.
+
+                                for (const item of itemsToReserve) {
+                                    const success = await reserveStock(design.id, item.category, item.size, 1);
+                                    if (!success) {
+                                        alert(`Sorry, the size ${item.size} for ${item.category} just went out of stock!`);
+                                        setIsSubmitting(false);
+                                        return; // Stop here
+                                    }
+                                }
+
+                                setIsSubmitting(false);
+                                setShowOrderForm(true);
+                            } catch (e) {
+                                console.error("Reservation failed", e);
+                                alert("Something went wrong checking stock. Please try again.");
+                                setIsSubmitting(false);
+                            }
                         }}
+                        disabled={isSubmitting}
                         className="btn btn-primary"
-                        style={{ height: '64px', fontSize: '1.2rem', borderRadius: '16px' }}
+                        style={{ height: '64px', fontSize: '1.2rem', borderRadius: '16px', opacity: isSubmitting ? 0.7 : 1 }}
                     >
                         <ShoppingCart size={22} />
-                        Proceed to Checkout
+                        {isSubmitting ? 'Checking Stock...' : 'Proceed to Checkout'}
                     </button>
                 </div>
             </div>
