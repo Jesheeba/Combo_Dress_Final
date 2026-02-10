@@ -267,6 +267,38 @@ export const updateOrderStatus = async (orderId: string, status: string) => {
     if (error) console.error('Error updating order status:', error);
 };
 
+export const deleteOrder = async (orderId: string) => {
+    if (!isSupabaseConfigured) {
+        const orders = await fetchOrders();
+        const updated = orders.filter(o => o.id !== orderId);
+        localStorage.setItem(ORDERS_KEY, JSON.stringify(updated));
+        return;
+    }
+
+    const { error } = await supabase
+        .from('orders')
+        .delete()
+        .match({ id: orderId });
+
+    if (error) console.error('Error deleting order:', error);
+};
+
+export const deleteOrders = async (orderIds: string[]) => {
+    if (!isSupabaseConfigured) {
+        const orders = await fetchOrders();
+        const updated = orders.filter(o => !orderIds.includes(o.id));
+        localStorage.setItem(ORDERS_KEY, JSON.stringify(updated));
+        return;
+    }
+
+    const { error } = await supabase
+        .from('orders')
+        .delete()
+        .in('id', orderIds);
+
+    if (error) console.error('Error deleting orders:', error);
+};
+
 export const uploadImage = async (file: File): Promise<string> => {
     if (!isSupabaseConfigured) {
         return new Promise((resolve, reject) => {

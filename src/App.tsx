@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import type { Design, Order, ComboType } from './types';
-import { fetchDesigns, syncDesign, removeDesign, fetchOrders, submitOrder, updateOrderStatus, subscribeToOrders, subscribeToDesigns, mapOrderFromDB } from './data';
+import { fetchDesigns, syncDesign, removeDesign, fetchOrders, submitOrder, updateOrderStatus, deleteOrder, deleteOrders, subscribeToOrders, subscribeToDesigns, mapOrderFromDB } from './data';
 import Navigation from './components/Navigation';
 import StaffDashboard from './pages/StaffDashboard';
 import DesignManager from './pages/DesignManager';
@@ -279,6 +279,14 @@ function App() {
                                     }}
                                     onAcceptOrder={handleAcceptOrder}
                                     onRejectOrder={handleRejectOrder}
+                                    onDeleteOrder={async (orderId) => {
+                                        await deleteOrder(orderId);
+                                        setOrders(prev => prev.filter(o => o.id !== orderId));
+                                    }}
+                                    onDeleteOrders={async (orderIds) => {
+                                        await deleteOrders(orderIds);
+                                        setOrders(prev => prev.filter(o => !orderIds.includes(o.id)));
+                                    }}
                                 />
                             )}
                             {activeTab === 'manage' && (

@@ -288,43 +288,47 @@ const CustomerGallery: React.FC<CustomerGalleryProps> = ({ designs, onSelect, se
                     <div className="filter-sizes-grid">
                         {/* Men */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minHeight: '66px' }}>
-                            {(activeFilter === 'ALL' || activeFilter === 'F-S' || activeFilter === 'F-M' || activeFilter === 'F-M-S-D') ? (
+                            {(activeFilter === 'ALL' || activeFilter === 'F-S' || activeFilter === 'F-M' || activeFilter === 'F-M-S-D') && (
                                 <>
-                                    <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500, height: '14px', lineHeight: '14px' }}>Father Size</label>
+                                    <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500, height: '14px', lineHeight: '14px' }}>
+                                        {activeFilter === 'F-M' ? 'Men Size' : 'Father Size'}
+                                    </label>
                                     <select
                                         className="input"
                                         style={{ padding: '8px 12px', fontSize: '0.9rem', width: '100%', borderRadius: '10px', background: 'white', height: '40px' }}
                                         value={filterSizes.father}
                                         onChange={(e) => setFilterSizes({ ...filterSizes, father: e.target.value })}
                                     >
-                                        <option value="N/A">None (Skip)</option>
+                                        {activeFilter !== 'F-M' && <option value="N/A">None (Skip)</option>}
                                         {adultSizes.map(s => <option key={String(s)} value={String(s)}>{String(s)}</option>)}
                                     </select>
                                 </>
-                            ) : <div style={{ height: '60px' }} />}
+                            )}
                         </div>
 
                         {/* Women */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minHeight: '66px' }}>
-                            {(activeFilter === 'ALL' || activeFilter === 'M-D' || activeFilter === 'F-M' || activeFilter === 'F-M-S-D') ? (
+                            {(activeFilter === 'ALL' || activeFilter === 'M-D' || activeFilter === 'F-M' || activeFilter === 'F-M-S-D') && (
                                 <>
-                                    <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500, height: '14px', lineHeight: '14px' }}>Mother Size</label>
+                                    <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500, height: '14px', lineHeight: '14px' }}>
+                                        {activeFilter === 'F-M' ? 'Women Size' : 'Mother Size'}
+                                    </label>
                                     <select
                                         className="input"
                                         style={{ padding: '8px 12px', fontSize: '0.9rem', width: '100%', borderRadius: '10px', background: 'white', height: '40px' }}
                                         value={filterSizes.mother}
                                         onChange={(e) => setFilterSizes({ ...filterSizes, mother: e.target.value })}
                                     >
-                                        <option value="N/A">None (Optional)</option>
+                                        {activeFilter !== 'F-M' && <option value="N/A">None (Optional)</option>}
                                         {adultSizes.map(s => <option key={String(s)} value={String(s)}>{String(s)}</option>)}
                                     </select>
                                 </>
-                            ) : <div style={{ height: '60px' }} />}
+                            )}
                         </div>
 
                         {/* Boys */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minHeight: '66px' }}>
-                            {(activeFilter === 'ALL' || activeFilter === 'boys' || activeFilter === 'unisex' || activeFilter === 'F-S' || activeFilter === 'F-M-S-D') ? (
+                            {(activeFilter === 'ALL' || activeFilter === 'boys' || activeFilter === 'unisex' || activeFilter === 'F-S' || activeFilter === 'F-M-S-D') && (
                                 <>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '14px' }}>
                                         <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>Son Size</label>
@@ -360,12 +364,12 @@ const CustomerGallery: React.FC<CustomerGalleryProps> = ({ designs, onSelect, se
                                         ))}
                                     </div>
                                 </>
-                            ) : <div style={{ height: '60px' }} />}
+                            )}
                         </div>
 
                         {/* Girls */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minHeight: '66px' }}>
-                            {(activeFilter === 'ALL' || activeFilter === 'girls' || activeFilter === 'unisex' || activeFilter === 'M-D' || activeFilter === 'F-M-S-D') ? (
+                            {(activeFilter === 'ALL' || activeFilter === 'girls' || activeFilter === 'unisex' || activeFilter === 'M-D' || activeFilter === 'F-M-S-D') && (
                                 <>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '14px' }}>
                                         <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>Daughter Size</label>
@@ -401,7 +405,7 @@ const CustomerGallery: React.FC<CustomerGalleryProps> = ({ designs, onSelect, se
                                         ))}
                                     </div>
                                 </>
-                            ) : <div style={{ height: '60px' }} />}
+                            )}
                         </div>
                     </div>
                 </div>

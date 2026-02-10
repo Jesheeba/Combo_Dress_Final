@@ -16,10 +16,12 @@ interface StaffDashboardProps {
     onBack: () => void;
     viewMode: 'inventory' | 'orders' | 'gallery';
     setViewMode: (mode: 'inventory' | 'orders' | 'gallery') => void;
+    onDeleteOrder: (orderId: string) => Promise<void>;
+    onDeleteOrders?: (orderIds: string[]) => Promise<void>;
 }
 
 const StaffDashboard: React.FC<StaffDashboardProps> = ({
-    designs, orders, updateInventory, deleteDesign, onEdit, onAddNew, onAcceptOrder, onRejectOrder, onBack, viewMode, setViewMode
+    designs, orders, updateInventory, deleteDesign, onEdit, onAddNew, onAcceptOrder, onRejectOrder, onBack, viewMode, setViewMode, onDeleteOrder, onDeleteOrders
 }) => {
     const navigate = useNavigate();
 
@@ -28,6 +30,11 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({
     const [isExportingImages, setIsExportingImages] = useState(false);
     const [exportProgress, setExportProgress] = useState(0);
     const [deleteId, setDeleteId] = useState<string | null>(null);
+    const [deleteOrderId, setDeleteOrderId] = useState<string | null>(null);
+    const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
+    const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+
+    const [orderView, setOrderView] = useState<'active' | 'history'>('active');
 
     const filteredDesigns = designs.filter(design => {
         const matchesSearch =
@@ -51,6 +58,9 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({
     });
 
     const pendingOrders = orders.filter(o => o.status === 'pending');
+    const historyOrders = useMemo(() => orders
+        .filter(o => o.status === 'accepted' || o.status === 'rejected')
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()), [orders]);
 
     const adultSizes: (keyof AdultSizeStock)[] = ['M', 'L', 'XL', 'XXL', '3XL'];
     const kidsSizes: (keyof KidsSizeStock)[] = ['0-1', '1-2', '2-3', '3-4', '4-5', '5-6', '6-7', '7-8', '9-10', '11-12', '13-14'];
@@ -166,8 +176,10 @@ Status: ${order.status.toUpperCase()}
                 flexWrap: 'wrap',
                 gap: '16px'
             }}>
-                <div className="mobile-stack" style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', width: '100%' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'space-between', width: '100%' }}>
+                <div className="mobile-stack" style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
+
+                    {/* Top Row: Back, Title, and Mobile New Button */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <button
                                 onClick={onBack}
@@ -184,20 +196,86 @@ Status: ${order.status.toUpperCase()}
                                 )}
                             </h1>
                         </div>
-                        <div className="mobile-only" style={{ display: 'flex', gap: '8px' }}>
+                        <div className="mobile-only">
                             <button onClick={onAddNew} className="btn btn-primary" style={{ padding: '8px 12px' }}>
                                 <Plus size={18} />
                                 New
                             </button>
                         </div>
                     </div>
-                    <div style={{ position: 'relative', width: '100%', maxWidth: '100%', flexGrow: 1 }}>
-                        <Search style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} size={16} />
-                        <input
-                            type="text" className="input" placeholder="Search..."
-                            style={{ paddingLeft: '36px', height: '40px' }}
-                            value={search} onChange={(e) => setSearch(e.target.value)}
-                        />
+
+                    {/* Middle Row: Controls (Toggles, Bulk Delete) & Search */}
+                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center', width: '100%' }}>
+
+                        {/* Search Bar - Full width on very small screens, responsive otherwise */}
+                        <div style={{ position: 'relative', flexGrow: 1, minWidth: '200px' }}>
+                            <Search style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} size={16} />
+                            <input
+                                type="text" className="input" placeholder="Search..."
+                                style={{ paddingLeft: '36px', height: '40px', width: '100%' }}
+                                value={search} onChange={(e) => setSearch(e.target.value)}
+                            />
+                        </div>
+
+                        {/* Order Toggles and Bulk Delete */}
+                        {viewMode === 'orders' && (
+                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', flexGrow: 1, justifyContent: 'flex-end' }}>
+                                <div style={{ display: 'flex', background: 'var(--bg-main)', padding: '4px', borderRadius: '8px', flexWrap: 'wrap', flexGrow: 1, minWidth: 'fit-content', justifyContent: 'center' }}>
+                                    <button
+                                        onClick={() => setOrderView('active')}
+                                        style={{
+                                            padding: '6px 12px',
+                                            borderRadius: '6px',
+                                            border: 'none',
+                                            background: orderView === 'active' ? 'var(--primary)' : 'transparent',
+                                            color: orderView === 'active' ? 'white' : 'var(--text-muted)',
+                                            fontWeight: 600,
+                                            fontSize: '0.85rem',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s',
+                                            minWidth: '70px'
+                                        }}
+                                    >
+                                        Active
+                                    </button>
+                                    <button
+                                        onClick={() => setOrderView('history')}
+                                        style={{
+                                            padding: '6px 12px',
+                                            borderRadius: '6px',
+                                            border: 'none',
+                                            background: orderView === 'history' ? 'var(--primary)' : 'transparent',
+                                            color: orderView === 'history' ? 'white' : 'var(--text-muted)',
+                                            fontWeight: 600,
+                                            fontSize: '0.85rem',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s',
+                                            minWidth: '70px'
+                                        }}
+                                    >
+                                        History
+                                    </button>
+                                </div>
+
+                                {orderView === 'history' && selectedOrders.size > 0 && onDeleteOrders && (
+                                    <button
+                                        onClick={() => setIsBulkDeleting(true)}
+                                        className="btn btn-primary"
+                                        style={{
+                                            background: 'var(--danger)',
+                                            borderColor: 'var(--danger)',
+                                            padding: '6px 12px',
+                                            fontSize: '0.85rem',
+                                            gap: '6px',
+                                            whiteSpace: 'nowrap'
+                                        }}
+                                    >
+                                        <Trash2 size={16} />
+                                        Delete ({selectedOrders.size})
+                                    </button>
+                                )}
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -232,7 +310,7 @@ Status: ${order.status.toUpperCase()}
                     )}
                     <button onClick={() => navigate('/customerview')} className="btn btn-secondary" style={{ padding: '8px 20px', flexGrow: 1 }}>
                         <Eye size={18} />
-                        <span>View</span>
+                        <span>Customer view</span>
                     </button>
 
                     <button onClick={onAddNew} className="btn btn-primary tablet-up" style={{ padding: '8px 20px' }}>
@@ -451,89 +529,194 @@ Status: ${order.status.toUpperCase()}
 
             {viewMode === 'orders' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    {pendingOrders.length === 0 ? (
-                        <div style={{ textAlign: 'center', padding: '100px', opacity: 0.5 }}>
-                            <Clock size={48} style={{ marginBottom: '16px' }} />
-                            <p>No pending orders at the moment.</p>
-                        </div>
-                    ) : (
-                        pendingOrders.map(order => (
-                            <div key={order.id} className="glass-card" style={{ padding: 'max(16px, 3vw)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px', border: '1px solid var(--border-subtle)' }}>
-                                <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
-                                    <div style={{ background: 'var(--primary)', color: 'white', padding: '10px', borderRadius: '12px', flexShrink: 0 }}>
-                                        <ShoppingBag size={20} />
-                                    </div>
-                                    <div style={{ minWidth: '200px', flexGrow: 1 }}>
-                                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '4px' }}>
-                                            Order #{order.id.slice(-6).toUpperCase()} • {new Date(order.createdAt).toLocaleTimeString()}
-                                        </div>
-                                        <h3 style={{ margin: 0 }}>
-                                            {designs.find(d => d.id === order.designId)?.name || 'Unknown Design'}
-                                        </h3>
-
-                                        {/* Customer Details */}
-                                        <div style={{ marginTop: '8px', padding: '8px', background: 'var(--bg-secondary)', borderRadius: '8px', fontSize: '0.85rem' }}>
-                                            <div style={{ fontWeight: 600, marginBottom: '4px' }}>Customer Details:</div>
-                                            <div>{order.customerName}</div>
-                                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{order.customerEmail}</div>
-                                            <div>{order.customerCountryCode && <span style={{ color: 'var(--text-muted)', marginRight: '4px' }}>{order.customerCountryCode}</span>}{order.customerPhone}</div>
-                                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{order.customerAddress}</div>
-                                        </div>
-
-                                        <div style={{ display: 'flex', gap: '12px', marginTop: '8px', flexWrap: 'wrap' }}>
-                                            <span className="badge badge-info">{order.comboType}</span>
-                                            {Object.entries(order.selectedSizes)
-                                                .filter(([_, size]) => size !== 'N/A')
-                                                .map(([member, size]) => (
-                                                    <div key={member} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                                        <span style={{ fontSize: '0.8rem', color: 'var(--text-main)', background: 'rgba(0,0,0,0.05)', padding: '2px 8px', borderRadius: '4px' }}>
-                                                            {member}: <strong>{size}</strong>
-                                                        </span>
-                                                        {order.notes?.[member] && (
-                                                            <span style={{ fontSize: '0.7rem', color: 'var(--primary)', fontStyle: 'italic', maxWidth: '150px' }}>
-                                                                "{order.notes[member]}"
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                ))}
-                                        </div>
-                                    </div>
-                                </div>
-                                <div style={{ display: 'flex', gap: '8px', width: '100%', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                                    <button
-                                        onClick={() => downloadOrder(order)}
-                                        className="btn btn-ghost btn-download"
-                                        style={{ flexGrow: 1, justifyContent: 'center', fontSize: '0.85rem' }}
-                                    >
-                                        Download Invoice
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            const design = designs.find(d => d.id === order.designId);
-                                            if (design) downloadSingleImage(design.imageUrl, design.name);
-                                        }}
-                                        className="btn btn-ghost btn-download"
-                                        style={{ flexGrow: 1, justifyContent: 'center', fontSize: '0.85rem' }}
-                                    >
-                                        Download Dress Image
-                                    </button>
-                                    <button
-                                        onClick={() => onRejectOrder(order.id)}
-                                        className="btn btn-ghost btn-reject" style={{ color: 'var(--danger)', gap: '8px', flexGrow: 1, justifyContent: 'center', fontSize: '0.85rem' }}
-                                    >
-                                        <XCircle size={18} />
-                                        Reject
-                                    </button>
-                                    <button
-                                        onClick={() => onAcceptOrder(order)}
-                                        className="btn btn-primary" style={{ gap: '8px', padding: '12px 32px', flexGrow: 2, justifyContent: 'center' }}
-                                    >
-                                        <CheckCircle2 size={18} />
-                                        Accept
-                                    </button>
-                                </div>
+                    {orderView === 'active' ? (
+                        pendingOrders.length === 0 ? (
+                            <div style={{ textAlign: 'center', padding: '100px', opacity: 0.5 }}>
+                                <Clock size={48} style={{ marginBottom: '16px' }} />
+                                <p>No pending orders at the moment.</p>
                             </div>
-                        ))
+                        ) : (
+                            pendingOrders.map(order => (
+                                <div key={order.id} className="glass-card" style={{ padding: 'max(16px, 3vw)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px', border: '1px solid var(--border-subtle)' }}>
+                                    <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                        <div style={{ background: 'var(--primary)', color: 'white', padding: '10px', borderRadius: '12px', flexShrink: 0 }}>
+                                            <ShoppingBag size={20} />
+                                        </div>
+                                        <div style={{ minWidth: '200px', flexGrow: 1 }}>
+                                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                                                Order #{order.id.slice(-6).toUpperCase()} • {new Date(order.createdAt).toLocaleTimeString()}
+                                            </div>
+                                            <h3 style={{ margin: 0 }}>
+                                                {designs.find(d => d.id === order.designId)?.name || 'Unknown Design'}
+                                            </h3>
+
+                                            {/* Customer Details */}
+                                            <div style={{ marginTop: '8px', padding: '8px', background: 'var(--bg-secondary)', borderRadius: '8px', fontSize: '0.85rem' }}>
+                                                <div style={{ fontWeight: 600, marginBottom: '4px' }}>Customer Details:</div>
+                                                <div>{order.customerName}</div>
+                                                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{order.customerEmail}</div>
+                                                <div>{order.customerCountryCode && <span style={{ color: 'var(--text-muted)', marginRight: '4px' }}>{order.customerCountryCode}</span>}{order.customerPhone}</div>
+                                                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{order.customerAddress}</div>
+                                            </div>
+
+                                            <div style={{ display: 'flex', gap: '12px', marginTop: '8px', flexWrap: 'wrap' }}>
+                                                <span className="badge badge-info">{order.comboType}</span>
+                                                {Object.entries(order.selectedSizes)
+                                                    .filter(([_, size]) => size !== 'N/A')
+                                                    .map(([member, size]) => (
+                                                        <div key={member} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                                            <span style={{ fontSize: '0.8rem', color: 'var(--text-main)', background: 'rgba(0,0,0,0.05)', padding: '2px 8px', borderRadius: '4px' }}>
+                                                                {member}: <strong>{size}</strong>
+                                                            </span>
+                                                            {order.notes?.[member] && (
+                                                                <span style={{ fontSize: '0.7rem', color: 'var(--primary)', fontStyle: 'italic', maxWidth: '150px' }}>
+                                                                    "{order.notes[member]}"
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '8px', width: '100%', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                                        <button
+                                            onClick={() => downloadOrder(order)}
+                                            className="btn btn-ghost btn-download"
+                                            style={{ flexGrow: 1, justifyContent: 'center', fontSize: '0.85rem' }}
+                                        >
+                                            Download Invoice
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                const design = designs.find(d => d.id === order.designId);
+                                                if (design) downloadSingleImage(design.imageUrl, design.name);
+                                            }}
+                                            className="btn btn-ghost btn-download"
+                                            style={{ flexGrow: 1, justifyContent: 'center', fontSize: '0.85rem' }}
+                                        >
+                                            Download Dress Image
+                                        </button>
+                                        <button
+                                            onClick={() => onRejectOrder(order.id)}
+                                            className="btn btn-ghost btn-reject" style={{ color: 'var(--danger)', gap: '8px', flexGrow: 1, justifyContent: 'center', fontSize: '0.85rem' }}
+                                        >
+                                            <XCircle size={18} />
+                                            Reject
+                                        </button>
+                                        <button
+                                            onClick={() => onAcceptOrder(order)}
+                                            className="btn btn-primary" style={{ gap: '8px', padding: '12px 32px', flexGrow: 2, justifyContent: 'center' }}
+                                        >
+                                            <CheckCircle2 size={18} />
+                                            Accept
+                                        </button>
+                                    </div>
+                                </div>
+                            ))
+                        )
+                    ) : (
+                        historyOrders.length === 0 ? (
+                            <div style={{ textAlign: 'center', padding: '100px', opacity: 0.5 }}>
+                                <Clock size={48} style={{ marginBottom: '16px' }} />
+                                <p>No order history found.</p>
+                            </div>
+                        ) : (
+                            historyOrders.map(order => (
+                                <div key={order.id} className="glass-card" style={{ padding: 'max(16px, 3vw)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px', border: '1px solid var(--border-subtle)', opacity: 0.9 }}>
+                                    <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center' }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedOrders.has(order.id)}
+                                                onChange={(e) => {
+                                                    const newSelected = new Set(selectedOrders);
+                                                    if (e.target.checked) newSelected.add(order.id);
+                                                    else newSelected.delete(order.id);
+                                                    setSelectedOrders(newSelected);
+                                                }}
+                                                style={{ width: '18px', height: '18px', marginRight: '12px', cursor: 'pointer', accentColor: 'var(--primary)' }}
+                                            />
+                                        </div>
+                                        <div style={{
+                                            background: order.status === 'accepted' ? 'var(--success, #10b981)' : 'var(--danger, #ef4444)',
+                                            color: 'white', padding: '10px', borderRadius: '12px', flexShrink: 0
+                                        }}>
+                                            {order.status === 'accepted' ? <CheckCircle2 size={20} /> : <XCircle size={20} />}
+                                        </div>
+                                        <div style={{ minWidth: '200px', flexGrow: 1 }}>
+                                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                                                Order #{order.id.slice(-6).toUpperCase()} • {new Date(order.createdAt).toLocaleDateString()} {new Date(order.createdAt).toLocaleTimeString()}
+                                            </div>
+                                            <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                {designs.find(d => d.id === order.designId)?.name || 'Unknown Design'}
+                                                <span style={{
+                                                    fontSize: '0.75rem',
+                                                    padding: '2px 8px',
+                                                    borderRadius: '4px',
+                                                    background: order.status === 'accepted' ? '#dcfce7' : '#fee2e2',
+                                                    color: order.status === 'accepted' ? '#166534' : '#991b1b',
+                                                    textTransform: 'uppercase',
+                                                    fontWeight: 700
+                                                }}>
+                                                    {order.status}
+                                                </span>
+                                            </h3>
+
+                                            {/* Customer Details */}
+                                            <div style={{ marginTop: '8px', padding: '8px', background: 'var(--bg-secondary)', borderRadius: '8px', fontSize: '0.85rem' }}>
+                                                <div style={{ fontWeight: 600, marginBottom: '4px' }}>Customer Details:</div>
+                                                <div>{order.customerName}</div>
+                                                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{order.customerEmail}</div>
+                                                <div>{order.customerCountryCode && <span style={{ color: 'var(--text-muted)', marginRight: '4px' }}>{order.customerCountryCode}</span>}{order.customerPhone}</div>
+                                                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{order.customerAddress}</div>
+                                            </div>
+
+                                            <div style={{ display: 'flex', gap: '12px', marginTop: '8px', flexWrap: 'wrap' }}>
+                                                <span className="badge badge-info">{order.comboType}</span>
+                                                {Object.entries(order.selectedSizes)
+                                                    .filter(([_, size]) => size !== 'N/A')
+                                                    .map(([member, size]) => (
+                                                        <div key={member} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                                            <span style={{ fontSize: '0.8rem', color: 'var(--text-main)', background: 'rgba(0,0,0,0.05)', padding: '2px 8px', borderRadius: '4px' }}>
+                                                                {member}: <strong>{size}</strong>
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '8px', width: '100%', justifyContent: 'flex-end', flexWrap: 'wrap', marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--border-subtle)' }}>
+                                        <button
+                                            onClick={() => downloadOrder(order)}
+                                            className="btn btn-ghost btn-download"
+                                            style={{ flexGrow: 1, justifyContent: 'center', fontSize: '0.85rem', minWidth: '140px' }}
+                                        >
+                                            <Download size={16} />
+                                            Invoice
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                const design = designs.find(d => d.id === order.designId);
+                                                if (design) downloadSingleImage(design.imageUrl, design.name);
+                                            }}
+                                            className="btn btn-ghost btn-download"
+                                            style={{ flexGrow: 1, justifyContent: 'center', fontSize: '0.85rem', minWidth: '140px' }}
+                                        >
+                                            <Images size={16} />
+                                            Dress Image
+                                        </button>
+                                        <button
+                                            onClick={() => setDeleteOrderId(order.id)}
+                                            className="btn btn-ghost"
+                                            style={{ color: 'var(--danger)', flexGrow: 0, justifyContent: 'center', fontSize: '0.85rem', padding: '8px' }}
+                                            title="Delete Order Record"
+                                        >
+                                            <Trash2 size={18} />
+                                        </button>
+                                    </div>
+                                </div>
+                            ))
+                        )
                     )}
                 </div>
             )}
@@ -620,7 +803,7 @@ Status: ${order.status.toUpperCase()}
                 </button>
             )}
 
-            {/* Custom Confirmation Modal */}
+            {/* Custom Confirmation Modal for Design Deletion */}
             {deleteId && (
                 <div style={{
                     position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000,
@@ -650,6 +833,85 @@ Status: ${order.status.toUpperCase()}
                                 style={{ background: 'var(--danger)', borderColor: 'var(--danger)' }}
                             >
                                 Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Custom Confirmation Modal for Order Deletion */}
+            {deleteOrderId && (
+                <div style={{
+                    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'
+                }}>
+                    <div style={{
+                        background: 'var(--bg-main)', padding: '24px', borderRadius: '16px',
+                        maxWidth: '400px', width: '100%', boxShadow: 'var(--shadow-lg)'
+                    }}>
+                        <h3 style={{ margin: '0 0 12px 0', fontSize: '1.2rem' }}>Delete Order Record</h3>
+                        <p style={{ color: 'var(--text-muted)', marginBottom: '24px', lineHeight: '1.5' }}>
+                            Are you sure you want to delete this order from history? This action cannot be undone.
+                        </p>
+                        <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                            <button
+                                onClick={() => setDeleteOrderId(null)}
+                                className="btn btn-ghost"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => {
+                                    if (deleteOrderId) {
+                                        onDeleteOrder(deleteOrderId);
+                                        // Also remove from selection if present
+                                        const newSelected = new Set(selectedOrders);
+                                        newSelected.delete(deleteOrderId);
+                                        setSelectedOrders(newSelected);
+                                    }
+                                    setDeleteOrderId(null);
+                                }}
+                                className="btn btn-primary"
+                                style={{ background: 'var(--danger)', borderColor: 'var(--danger)' }}
+                            >
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Custom Confirmation Modal for Bulk Deletion */}
+            {isBulkDeleting && onDeleteOrders && (
+                <div style={{
+                    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'
+                }}>
+                    <div style={{
+                        background: 'var(--bg-main)', padding: '24px', borderRadius: '16px',
+                        maxWidth: '400px', width: '100%', boxShadow: 'var(--shadow-lg)'
+                    }}>
+                        <h3 style={{ margin: '0 0 12px 0', fontSize: '1.2rem' }}>Delete Selected Orders ({selectedOrders.size})</h3>
+                        <p style={{ color: 'var(--text-muted)', marginBottom: '24px', lineHeight: '1.5' }}>
+                            Are you sure you want to delete these {selectedOrders.size} orders? This action cannot be undone.
+                        </p>
+                        <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                            <button
+                                onClick={() => setIsBulkDeleting(false)}
+                                className="btn btn-ghost"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    await onDeleteOrders(Array.from(selectedOrders));
+                                    setSelectedOrders(new Set());
+                                    setIsBulkDeleting(false);
+                                }}
+                                className="btn btn-primary"
+                                style={{ background: 'var(--danger)', borderColor: 'var(--danger)' }}
+                            >
+                                Delete All
                             </button>
                         </div>
                     </div>
