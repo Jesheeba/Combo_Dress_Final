@@ -43,12 +43,14 @@ const Navigation: React.FC<NavigationProps> = ({ activeTab, setActiveTab }) => {
 
             <div className="nav-center" style={{
                 display: 'flex',
-                gap: '8px',
+                gap: '4px',
                 alignItems: 'center',
+                flexWrap: 'nowrap',
+                overflowX: 'auto',
+                scrollbarWidth: 'none',
+                WebkitOverflowScrolling: 'touch',
                 ...(location.pathname.startsWith('/customerview') ? {
-                    position: 'absolute',
-                    left: '50%',
-                    transform: 'translateX(-50%)'
+                    position: 'relative'
                 } : {})
             }}>
                 <button
@@ -60,30 +62,29 @@ const Navigation: React.FC<NavigationProps> = ({ activeTab, setActiveTab }) => {
                         }
                     }}
                     className={`btn ${activeTab === 'gallery' || activeTab === 'staff-gallery' ? 'btn-primary' : 'btn-ghost'}`}
-                    style={{ gap: '6px', fontSize: '0.85rem' }}
+                    style={{ gap: '6px', fontSize: '0.8rem', padding: '8px 12px', whiteSpace: 'nowrap' }}
                 >
-                    <ShoppingBag size={16} />
+                    <ShoppingBag size={14} />
                     Gallery
                 </button>
 
                 {!location.pathname.startsWith('/customerview') && (
                     <>
-                        <div style={{ width: '1px', height: '24px', background: 'var(--border-subtle)', margin: '0 8px' }} />
                         <button
                             onClick={() => setActiveTab('dashboard')}
                             className={`btn ${activeTab === 'dashboard' ? 'btn-primary' : 'btn-ghost'}`}
-                            style={{ gap: '6px', fontSize: '0.85rem' }}
+                            style={{ gap: '6px', fontSize: '0.8rem', padding: '8px 12px', whiteSpace: 'nowrap' }}
                         >
-                            <LayoutDashboard size={16} />
-                            <span className="tablet-up">Inventory</span>
+                            <LayoutDashboard size={14} />
+                            Inventory
                         </button>
                         <button
                             onClick={() => setActiveTab('orders')}
                             className={`btn ${activeTab === 'orders' ? 'btn-primary' : 'btn-ghost'}`}
-                            style={{ gap: '6px', fontSize: '0.85rem' }}
+                            style={{ gap: '6px', fontSize: '0.8rem', padding: '8px 12px', whiteSpace: 'nowrap' }}
                         >
-                            <ShoppingBag size={16} />
-                            <span className="tablet-up">Orders</span>
+                            <ShoppingBag size={14} />
+                            Orders
                         </button>
                     </>
                 )}

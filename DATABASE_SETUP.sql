@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS designs (
 -- Note: In production, you should refine these for Staff vs Public roles
 ALTER TABLE designs ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Public Read Access" ON designs FOR SELECT USING (true);
+CREATE POLICY "Public Delete Access" ON designs FOR DELETE USING (true);
 CREATE POLICY "Staff Full Access" ON designs FOR ALL USING (true);
 
 
@@ -22,7 +23,7 @@ CREATE POLICY "Staff Full Access" ON designs FOR ALL USING (true);
 -- Stores customer orders pending acceptance by staff
 CREATE TABLE IF NOT EXISTS orders (
     id TEXT PRIMARY KEY,
-    designId TEXT NOT NULL,
+    designId TEXT REFERENCES designs(id) ON DELETE CASCADE,
     comboType TEXT NOT NULL,
     selectedSizes JSONB NOT NULL DEFAULT '{}'::jsonb,
     status TEXT NOT NULL DEFAULT 'pending',

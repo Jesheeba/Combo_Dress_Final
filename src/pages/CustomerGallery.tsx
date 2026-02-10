@@ -7,23 +7,27 @@ interface CustomerGalleryProps {
     designs: Design[];
     onSelect: (design: Design, category?: string, config?: any) => void;
     selectedDesign: Design | null;
+    showNotification: (message: string, type: 'success' | 'error' | 'info') => void;
 }
 
 
 
-const CustomerGallery: React.FC<CustomerGalleryProps> = ({ designs, onSelect, selectedDesign }) => {
+const CustomerGallery: React.FC<CustomerGalleryProps> = ({ designs, onSelect, selectedDesign, showNotification }) => {
     const [search, setSearch] = useState('');
     const [activeFilter, setActiveFilter] = useState<string>('ALL');
     const [showResults, setShowResults] = useState(false);
 
     // Add effect to handle body scroll
     React.useEffect(() => {
-        if (showResults) {
-            document.body.style.overflow = 'hidden';
-        } else {
-            document.body.style.overflow = 'auto';
+        const scrollContainer = document.querySelector('main');
+        if (showResults && scrollContainer) {
+            scrollContainer.style.overflow = 'hidden';
+        } else if (scrollContainer) {
+            scrollContainer.style.overflow = 'auto';
         }
-        return () => { document.body.style.overflow = 'auto'; };
+        return () => {
+            if (scrollContainer) scrollContainer.style.overflow = 'auto';
+        };
     }, [showResults]);
 
     const [filterSizes, setFilterSizes] = useState<{
@@ -188,7 +192,7 @@ const CustomerGallery: React.FC<CustomerGalleryProps> = ({ designs, onSelect, se
                     flexDirection: 'column',
                     gap: '16px',
                     background: 'var(--bg-main)',
-                    padding: '24px',
+                    padding: 'max(16px, 3vw)',
                     borderRadius: '24px',
                     border: '1px solid var(--border-subtle)',
                     width: '100%',
@@ -210,7 +214,12 @@ const CustomerGallery: React.FC<CustomerGalleryProps> = ({ designs, onSelect, se
                 </div>
 
 
-                <div className="filter-categories-grid">
+                <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))',
+                    gap: '12px',
+                    marginBottom: '20px'
+                }}>
                     {/* All / Combos */}
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
@@ -470,48 +479,60 @@ const CustomerGallery: React.FC<CustomerGalleryProps> = ({ designs, onSelect, se
                     animation: 'fadeIn 0.2s ease-out'
                 }}>
                     <div style={{
+                        width: 'min(98%, 1100px)',
+                        height: 'min(98%, 95vh)',
                         background: 'var(--bg-main)',
-                        borderRadius: '24px',
-                        width: '100%',
-                        maxWidth: '1200px',
-                        maxHeight: '90vh',
+                        borderRadius: 'max(16px, 32px)',
+                        boxShadow: 'var(--shadow-xl)',
                         display: 'flex',
                         flexDirection: 'column',
-                        boxShadow: 'var(--shadow-xl)',
-                        border: '1px solid var(--border-subtle)',
-                        animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+                        overflow: 'hidden',
+                        animation: 'slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1)'
                     }}>
                         <div style={{
-                            padding: '20px 24px',
+                            padding: '16px 24px',
                             borderBottom: '1px solid var(--border-subtle)',
                             display: 'flex',
                             justifyContent: 'space-between',
                             alignItems: 'center',
-                            flexShrink: 0
+                            background: 'rgba(255,255,255,0.8)',
+                            backdropFilter: 'blur(10px)',
+                            zIndex: 10
                         }}>
-                            <h3 style={{ margin: 0, fontSize: '1.25rem' }}>Found {filteredDesigns.length} Designs</h3>
+                            <div>
+                                <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <Sparkles size={20} color="var(--accent)" />
+                                    Available Designs
+                                </h2>
+                                <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                                    Found {filteredDesigns.length} matching your criteria
+                                </p>
+                            </div>
                             <button
                                 onClick={() => setShowResults(false)}
-                                className="btn btn-ghost"
+                                className="touch-target"
                                 style={{
-                                    padding: '8px',
-                                    borderRadius: '50%',
-                                    width: '40px',
-                                    height: '40px',
+                                    background: 'var(--bg-secondary)',
+                                    border: 'none',
+                                    borderRadius: '12px',
+                                    cursor: 'pointer',
+                                    width: '44px',
+                                    height: '44px',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center'
                                 }}
                                 title="Close Results"
                             >
-                                <X size={24} color="var(--primary)" />
+                                <X size={20} color="var(--primary)" />
                             </button>
                         </div>
 
                         <div style={{
                             overflowY: 'auto',
-                            padding: '24px',
-                            flexGrow: 1
+                            padding: 'max(16px, 3vw)',
+                            flexGrow: 1,
+                            WebkitOverflowScrolling: 'touch'
                         }}>
                             {filteredDesigns.length === 0 ? (
                                 <div style={{ textAlign: 'center', padding: '60px', opacity: 0.5, border: '1px dashed var(--border-subtle)', borderRadius: '24px' }}>
@@ -602,16 +623,24 @@ const CustomerGallery: React.FC<CustomerGalleryProps> = ({ designs, onSelect, se
                                                 </div>
                                             </div>
 
-                                            <div style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-main)' }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <div className="modal-card-footer">
+                                                <div className="label-section">
                                                     <Sparkles size={16} color="var(--primary)" />
                                                     <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
                                                         {design.label || 'PREMIUM DESIGN'}
                                                     </span>
                                                 </div>
-                                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                                <div className="action-buttons">
                                                     <button
-                                                        onClick={(e) => { e.stopPropagation(); downloadSingleImage(design.imageUrl, design.name); }}
+                                                        onClick={async (e) => {
+                                                            e.stopPropagation();
+                                                            try {
+                                                                await downloadSingleImage(design.imageUrl, design.name);
+                                                                showNotification('Image downloaded successfully.', 'success');
+                                                            } catch (error) {
+                                                                showNotification('Failed to download image. Check CORS settings.', 'error');
+                                                            }
+                                                        }}
                                                         className="btn btn-ghost"
                                                         style={{ padding: '10px', borderRadius: '12px', border: '1px solid var(--border-subtle)' }}
                                                         title="Download Image"
@@ -629,7 +658,7 @@ const CustomerGallery: React.FC<CustomerGalleryProps> = ({ designs, onSelect, se
                                                             };
                                                             onSelect(design, activeFilter, config);
                                                         }}
-                                                        className={`btn ${selectedDesign?.id === design.id ? 'btn-primary' : 'btn-ghost'}`}
+                                                        className={`btn btn-select ${selectedDesign?.id === design.id ? 'btn-primary' : 'btn-ghost'}`}
                                                         style={{
                                                             padding: '10px 20px',
                                                             borderRadius: '12px',

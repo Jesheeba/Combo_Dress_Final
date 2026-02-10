@@ -8,6 +8,7 @@ interface DesignManagerProps {
     onSave: (design: Partial<Design>) => Promise<void>;
     editingDesign?: Design | null;
     onCancel?: () => void;
+    showNotification: (message: string, type: 'success' | 'error' | 'info') => void;
 }
 
 const emptyAdult = (): AdultSizeStock => ({ M: 0, L: 0, XL: 0, XXL: 0, '3XL': 0 });
@@ -16,7 +17,7 @@ const emptyKids = (): KidsSizeStock => ({
     '6-7': 0, '7-8': 0, '9-10': 0, '11-12': 0, '13-14': 0
 });
 
-const DesignManager: React.FC<DesignManagerProps> = ({ onSave, editingDesign: propsEditingDesign, onCancel }) => {
+const DesignManager: React.FC<DesignManagerProps> = ({ onSave, editingDesign: propsEditingDesign, onCancel, showNotification }) => {
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -55,8 +56,9 @@ const DesignManager: React.FC<DesignManagerProps> = ({ onSave, editingDesign: pr
         try {
             const url = await uploadImage(file);
             setFormData(prev => ({ ...prev, imageUrl: url }));
+            showNotification('Image uploaded successfully!', 'success');
         } catch (error) {
-            setError('Failed to upload image. Please check your storage configuration.');
+            showNotification('Failed to upload image. Please check storage configuration.', 'error');
         } finally {
             setIsUploading(false);
         }
@@ -66,7 +68,7 @@ const DesignManager: React.FC<DesignManagerProps> = ({ onSave, editingDesign: pr
         e.preventDefault();
         setError(null);
         if (!formData.imageUrl) {
-            setError('Please upload an image first.');
+            showNotification('Please upload an image first.', 'info');
             return;
         }
         await onSave(formData);
@@ -80,21 +82,31 @@ const DesignManager: React.FC<DesignManagerProps> = ({ onSave, editingDesign: pr
     };
 
     return (
-        <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '0 max(16px, 2vw) 48px max(16px, 2vw)', width: '100%', background: 'white' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '24px 0', borderBottom: '1px solid var(--border-subtle)', marginBottom: '40px' }}>
-                <h1 style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '1.8rem', margin: 0 }}>
+        <div className="w-full-force" style={{ maxWidth: '1400px', margin: '0 auto', padding: 'max(16px, 2vw)', width: '100%' }}>
+            <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '24px 0',
+                borderBottom: '1px solid var(--border-subtle)',
+                marginBottom: '40px',
+                flexWrap: 'wrap',
+                gap: '16px'
+            }}>
+                <h1 style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: 'clamp(1.5rem, 4vw, 2.2rem)', margin: 0 }}>
                     {editingDesign ? 'Edit Design' : 'New Entry'}
                     <Sparkles color="var(--accent)" />
                 </h1>
-                <button onClick={handleBack} className="btn btn-ghost" style={{ paddingRight: 0 }}>
+                <button onClick={handleBack} className="btn btn-ghost" style={{ padding: '8px 12px' }}>
                     <ArrowLeft size={18} />
-                    Dashboard
+                    <span className="tablet-up">Dashboard</span>
+                    <span className="mobile-only">Back</span>
                 </button>
             </div>
 
-            <form onSubmit={handleSubmit} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '64px' }}>
+            <form onSubmit={handleSubmit} className="design-manager-form">
                 {/* Image Section */}
-                <div>
+                <div className="glass-card" style={{ padding: '24px' }}>
                     <label style={{ display: 'block', marginBottom: '16px', fontWeight: 600, fontSize: '0.9rem', textTransform: 'uppercase', color: 'var(--text-muted)' }}>1. Visuals</label>
                     <div
                         onClick={() => fileInputRef.current?.click()}
@@ -147,14 +159,18 @@ const DesignManager: React.FC<DesignManagerProps> = ({ onSave, editingDesign: pr
 
 
                 {/* Details Section */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+                <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '32px', padding: '24px' }}>
                     <label style={{ display: 'block', fontWeight: 600, fontSize: '0.9rem', textTransform: 'uppercase', color: 'var(--text-muted)' }}>2. Details</label>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                         <div>
                             <label className="label">Product Name</label>
                             <input required className="input" placeholder="e.g. Royal Heritage Print" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                        <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                            gap: '16px'
+                        }}>
                             <div>
                                 <label className="label">Color Theme</label>
                                 <input required className="input" placeholder="e.g. Navy Blue" value={formData.color} onChange={(e) => setFormData({ ...formData, color: e.target.value })} />
@@ -199,6 +215,16 @@ const DesignManager: React.FC<DesignManagerProps> = ({ onSave, editingDesign: pr
                 </div>
             </form >
             <style>{`
+                .design-manager-form {
+                    display: grid;
+                    grid-template-columns: 1fr;
+                    gap: max(24px, 4vw);
+                }
+                @media (min-width: 992px) {
+                    .design-manager-form {
+                        grid-template-columns: 1fr 1fr;
+                    }
+                }
                 .label { display: block; margin-bottom: 8px; font-size: 0.8rem; font-weight: 700; color: var(--text-main); }
                 .spin { animation: spin 1s linear infinite; }
                 @keyframes spin { 100% { transform: rotate(360deg); } }

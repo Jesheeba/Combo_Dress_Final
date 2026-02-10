@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Design, Order, AdultSizeStock, KidsSizeStock } from '../types';
 import { Search, Edit2, Trash2, Plus, ArrowLeftRight, Clock, CheckCircle2, XCircle, ShoppingBag, Download, FileSpreadsheet, Images, Loader2, ArrowLeft, Eye } from 'lucide-react';
-import { exportToCSV, exportImagesToZip, downloadSingleImage } from '../data';
+import { exportToCSV, exportImagesToZip, downloadSingleImage, generateInvoicePDF } from '../data';
 
 interface StaffDashboardProps {
     designs: Design[];
@@ -16,12 +16,12 @@ interface StaffDashboardProps {
     onBack: () => void;
     viewMode: 'inventory' | 'orders' | 'gallery';
     setViewMode: (mode: 'inventory' | 'orders' | 'gallery') => void;
-    onDeleteOrder: (orderId: string) => Promise<void>;
-    onDeleteOrders?: (orderIds: string[]) => Promise<void>;
+    onDeleteOrders: (ids: string[]) => Promise<void>;
+    showNotification: (message: string, type: 'success' | 'error' | 'info') => void;
 }
 
 const StaffDashboard: React.FC<StaffDashboardProps> = ({
-    designs, orders, updateInventory, deleteDesign, onEdit, onAddNew, onAcceptOrder, onRejectOrder, onBack, viewMode, setViewMode, onDeleteOrder, onDeleteOrders
+    designs, orders, updateInventory, deleteDesign, onEdit, onAddNew, onAcceptOrder, onRejectOrder, onDeleteOrders, onBack, viewMode, setViewMode, showNotification
 }) => {
     const navigate = useNavigate();
 
@@ -30,11 +30,20 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({
     const [isExportingImages, setIsExportingImages] = useState(false);
     const [exportProgress, setExportProgress] = useState(0);
     const [deleteId, setDeleteId] = useState<string | null>(null);
-    const [deleteOrderId, setDeleteOrderId] = useState<string | null>(null);
-    const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
-    const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
     const [orderView, setOrderView] = useState<'active' | 'history'>('active');
+    const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
+    const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+
+    const handleToggleSelect = (id: string) => {
+        const newSelected = new Set(selectedOrderIds);
+        if (newSelected.has(id)) {
+            newSelected.delete(id);
+        } else {
+            newSelected.add(id);
+        }
+        setSelectedOrderIds(newSelected);
+    };
 
     const filteredDesigns = designs.filter(design => {
         const matchesSearch =
@@ -58,9 +67,7 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({
     });
 
     const pendingOrders = orders.filter(o => o.status === 'pending');
-    const historyOrders = useMemo(() => orders
-        .filter(o => o.status === 'accepted' || o.status === 'rejected')
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()), [orders]);
+    const historyOrders = orders.filter(o => o.status === 'accepted' || o.status === 'rejected').sort((a, b) => b.createdAt - a.createdAt);
 
     const adultSizes: (keyof AdultSizeStock)[] = ['M', 'L', 'XL', 'XXL', '3XL'];
     const kidsSizes: (keyof KidsSizeStock)[] = ['0-1', '1-2', '2-3', '3-4', '4-5', '5-6', '6-7', '7-8', '9-10', '11-12', '13-14'];
@@ -88,8 +95,6 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({
     }, [designs, pendingOrders]);
 
     const InlineInput = ({ value, onUpdate }: { value: number, onUpdate: (newVal: number) => void }) => {
-        const isLowStock = value >= 0 && value <= 5;
-
         return (
             <input
                 type="number"
@@ -101,8 +106,8 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({
                     width: '100%',
                     background: 'none',
                     border: 'none',
-                    color: isLowStock ? 'var(--danger)' : 'var(--text-main)',
-                    fontWeight: isLowStock ? 700 : 400,
+                    color: '#ef4444',
+                    fontWeight: 700,
                     opacity: 1,
                     textAlign: 'center',
                     fontSize: '0.9rem',
@@ -119,51 +124,27 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({
         setExportProgress(0);
         try {
             await exportImagesToZip(designs, (p) => setExportProgress(p));
+            showNotification('Images exported successfully!', 'success');
         } catch (error) {
-            alert('Bulk image export failed. Please try again.');
+            showNotification('Bulk image export failed. Please try again.', 'error');
         } finally {
             setIsExportingImages(false);
         }
     };
 
-    const downloadOrder = (order: Order) => {
-        const content = `
-ORDER RECEIPT
--------------
-Order ID: ${order.id.toUpperCase()}
-Date: ${new Date(order.createdAt).toLocaleString()}
-
-Customer:
-Name: ${order.customerName}
-Email: ${order.customerEmail}
-Phone: ${order.customerCountryCode} ${order.customerPhone}
-Address: ${order.customerAddress}
-
-Design: ${order.designId}
-Combo: ${order.comboType}
-
-Items:
-${Object.entries(order.selectedSizes).map(([member, size]) => `- ${member}: Size ${size}`).join('\n')}
-
-Status: ${order.status.toUpperCase()}
--------------
-`;
-        const blob = new Blob([content], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        const safeName = order.designId.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-        a.href = url;
-        a.download = `order_${safeName}_${order.id.slice(-4)}.txt`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+    const downloadOrder = async (order: Order) => {
+        try {
+            await generateInvoicePDF(order);
+            showNotification('Invoice generated successfully.', 'success');
+        } catch (error) {
+            showNotification('Failed to generate invoice.', 'error');
+        }
     };
 
 
 
     return (
-        <div style={{ padding: 'max(16px, 2vw)', width: '100%', overflowX: 'hidden' }}>
+        <div className="w-full-force" style={{ maxWidth: 'none', margin: '0 auto', padding: viewMode === 'inventory' ? 'max(16px, 2vw) 0' : 'max(16px, 2vw)', width: '100%', overflowX: 'hidden' }}>
             <div style={{
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -174,12 +155,11 @@ Status: ${order.status.toUpperCase()}
                 borderRadius: '16px',
                 border: '1px solid var(--border-subtle)',
                 flexWrap: 'wrap',
-                gap: '16px'
+                gap: '16px',
+                margin: viewMode === 'inventory' ? '0 max(16px, 2vw) 24px' : '0 0 24px'
             }}>
-                <div className="mobile-stack" style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
-
-                    {/* Top Row: Back, Title, and Mobile New Button */}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                <div className="mobile-stack" style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', width: '100%' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'space-between', width: '100%' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <button
                                 onClick={onBack}
@@ -196,87 +176,51 @@ Status: ${order.status.toUpperCase()}
                                 )}
                             </h1>
                         </div>
-                        <div className="mobile-only">
+                        <div className="mobile-only" style={{ display: 'flex', gap: '8px' }}>
                             <button onClick={onAddNew} className="btn btn-primary" style={{ padding: '8px 12px' }}>
                                 <Plus size={18} />
                                 New
                             </button>
                         </div>
                     </div>
-
-                    {/* Middle Row: Controls (Toggles, Bulk Delete) & Search */}
-                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center', width: '100%' }}>
-
-                        {/* Search Bar - Full width on very small screens, responsive otherwise */}
-                        <div style={{ position: 'relative', flexGrow: 1, minWidth: '200px' }}>
+                    {viewMode === 'orders' ? (
+                        selectedOrderIds.size > 0 ? (
+                            <button
+                                onClick={() => setShowBulkDeleteConfirm(true)}
+                                className="btn btn-primary"
+                                style={{ background: 'var(--danger)', borderColor: 'var(--danger)', display: 'flex', alignItems: 'center', gap: '8px' }}
+                            >
+                                <Trash2 size={16} />
+                                Delete Selected ({selectedOrderIds.size})
+                            </button>
+                        ) : (
+                            <div style={{ display: 'flex', gap: '8px', background: 'var(--bg-main)', padding: '4px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
+                                <button
+                                    onClick={() => setOrderView('active')}
+                                    className={`btn ${orderView === 'active' ? 'btn-primary' : 'btn-ghost'}`}
+                                    style={{ padding: '6px 16px', fontSize: '0.85rem' }}
+                                >
+                                    Active
+                                </button>
+                                <button
+                                    onClick={() => setOrderView('history')}
+                                    className={`btn ${orderView === 'history' ? 'btn-black-active active' : 'btn-ghost btn-black-active'}`}
+                                    style={{ padding: '6px 16px', fontSize: '0.85rem' }}
+                                >
+                                    History
+                                </button>
+                            </div>
+                        )
+                    ) : (
+                        <div style={{ position: 'relative', width: '100%', maxWidth: '100%', flexGrow: 1 }}>
                             <Search style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} size={16} />
                             <input
                                 type="text" className="input" placeholder="Search..."
-                                style={{ paddingLeft: '36px', height: '40px', width: '100%' }}
+                                style={{ paddingLeft: '36px', height: '40px' }}
                                 value={search} onChange={(e) => setSearch(e.target.value)}
                             />
                         </div>
-
-                        {/* Order Toggles and Bulk Delete */}
-                        {viewMode === 'orders' && (
-                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', flexGrow: 1, justifyContent: 'flex-end' }}>
-                                <div style={{ display: 'flex', background: 'var(--bg-main)', padding: '4px', borderRadius: '8px', flexWrap: 'wrap', flexGrow: 1, minWidth: 'fit-content', justifyContent: 'center' }}>
-                                    <button
-                                        onClick={() => setOrderView('active')}
-                                        style={{
-                                            padding: '6px 12px',
-                                            borderRadius: '6px',
-                                            border: 'none',
-                                            background: orderView === 'active' ? 'var(--primary)' : 'transparent',
-                                            color: orderView === 'active' ? 'white' : 'var(--text-muted)',
-                                            fontWeight: 600,
-                                            fontSize: '0.85rem',
-                                            cursor: 'pointer',
-                                            transition: 'all 0.2s',
-                                            minWidth: '70px'
-                                        }}
-                                    >
-                                        Active
-                                    </button>
-                                    <button
-                                        onClick={() => setOrderView('history')}
-                                        style={{
-                                            padding: '6px 12px',
-                                            borderRadius: '6px',
-                                            border: 'none',
-                                            background: orderView === 'history' ? 'var(--primary)' : 'transparent',
-                                            color: orderView === 'history' ? 'white' : 'var(--text-muted)',
-                                            fontWeight: 600,
-                                            fontSize: '0.85rem',
-                                            cursor: 'pointer',
-                                            transition: 'all 0.2s',
-                                            minWidth: '70px'
-                                        }}
-                                    >
-                                        History
-                                    </button>
-                                </div>
-
-                                {orderView === 'history' && selectedOrders.size > 0 && onDeleteOrders && (
-                                    <button
-                                        onClick={() => setIsBulkDeleting(true)}
-                                        className="btn btn-primary"
-                                        style={{
-                                            background: 'var(--danger)',
-                                            borderColor: 'var(--danger)',
-                                            padding: '6px 12px',
-                                            fontSize: '0.85rem',
-                                            gap: '6px',
-                                            whiteSpace: 'nowrap'
-                                        }}
-                                    >
-                                        <Trash2 size={16} />
-                                        Delete ({selectedOrders.size})
-                                    </button>
-                                )}
-                            </div>
-                        )}
-                    </div>
+                    )}
                 </div>
 
                 <div className="mobile-stack" style={{ display: 'flex', gap: '12px', alignItems: 'center', width: '100%', justifyContent: 'flex-end', marginTop: '12px' }}>
@@ -320,163 +264,177 @@ Status: ${order.status.toUpperCase()}
                 </div>
             </div>
 
-            {/* Analytics Dashboard */}
-            {viewMode === 'inventory' && (
-                <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-                    gap: '16px',
-                    marginBottom: '24px'
-                }}>
-                    {[
-                        { id: 'all', label: 'Total Designs', value: analytics.totalDesigns, icon: FileSpreadsheet, color: '#6366f1' },
-                        { id: 'all', label: 'Total Units', value: analytics.totalStock, icon: ShoppingBag, color: '#10b981' },
-                        { id: 'low-stock', label: 'Low Stock', value: analytics.lowStockCount, icon: XCircle, color: '#ef4444' },
-                        { id: 'orders', label: 'Orders', value: analytics.pendingOrders, icon: Clock, color: '#f59e0b' },
-                    ].map((stat, i) => (
-                        <div
-                            key={i}
-                            className="glass-card"
-                            style={{
-                                padding: '16px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '12px',
-                                cursor: 'pointer',
-                                border: (stat.id === analyticsFilter && stat.id !== 'all') ? `2px solid ${stat.color}` : '1px solid var(--border-subtle)',
-                                transform: (stat.id === analyticsFilter && stat.id !== 'all') ? 'scale(1.02)' : 'none',
-                                transition: 'all 0.2s ease',
-                                background: (stat.id === analyticsFilter && stat.id !== 'all') ? `${stat.color}05` : 'var(--bg-secondary)'
-                            }}
-                            onClick={() => {
-                                if (stat.id === 'orders') {
-                                    setViewMode('orders');
-                                } else {
-                                    setAnalyticsFilter(stat.id as any);
-                                    if (stat.id === 'all') setSearch('');
-                                }
-                            }}
-                        >
-                            <div style={{ background: `${stat.color}20`, color: stat.color, padding: '8px', borderRadius: '10px' }}>
-                                <stat.icon size={20} />
-                            </div>
-                            <div>
-                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{stat.label}</div>
-                                <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>{stat.value}</div>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            )}
-
-            {analyticsFilter === 'low-stock' && (
-                <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--danger)' }}>
-                        <XCircle size={18} />
-                        <span style={{ fontWeight: 600 }}>Filtering: Low Stock Items Only</span>
-                    </div>
-                    <button onClick={() => setAnalyticsFilter('all')} className="btn btn-ghost" style={{ fontSize: '0.8rem' }}>
-                        Clear Filter
-                    </button>
-                </div>
-            )}
-
             {viewMode === 'inventory' && (
                 <>
+                    {/* Analytics Dashboard */}
+                    <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                        gap: '16px',
+                        marginBottom: '24px',
+                        padding: '0 max(16px, 2vw)'
+                    }}>
+                        {[
+                            { id: 'all', label: 'Total Designs', value: analytics.totalDesigns, icon: FileSpreadsheet, color: '#6366f1' },
+                            { id: 'all', label: 'Total Units', value: analytics.totalStock, icon: ShoppingBag, color: '#10b981' },
+                            { id: 'low-stock', label: 'Low Stock', value: analytics.lowStockCount, icon: XCircle, color: '#ef4444' },
+                            { id: 'orders', label: 'Orders', value: analytics.pendingOrders, icon: Clock, color: '#f59e0b' },
+                        ].map((stat, i) => (
+                            <div
+                                key={i}
+                                className="glass-card"
+                                style={{
+                                    padding: '16px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '12px',
+                                    cursor: 'pointer',
+                                    border: (stat.id === analyticsFilter && stat.id !== 'all') ? `2px solid ${stat.color}` : '1px solid var(--border-subtle)',
+                                    transform: (stat.id === analyticsFilter && stat.id !== 'all') ? 'scale(1.02)' : 'none',
+                                    transition: 'all 0.2s ease',
+                                    background: (stat.id === analyticsFilter && stat.id !== 'all') ? `${stat.color}05` : 'var(--bg-secondary)'
+                                }}
+                                onClick={() => {
+                                    if (stat.id === 'orders') {
+                                        setViewMode('orders');
+                                    } else {
+                                        setAnalyticsFilter(stat.id as any);
+                                        if (stat.id === 'all') setSearch('');
+                                    }
+                                }}
+                            >
+                                <div style={{ background: `${stat.color}20`, color: stat.color, padding: '8px', borderRadius: '10px' }}>
+                                    <stat.icon size={20} />
+                                </div>
+                                <div>
+                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{stat.label}</div>
+                                    <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>{stat.value}</div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {analyticsFilter === 'low-stock' && (
+                        <div style={{ marginBottom: '16px', padding: '0 max(16px, 2vw)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--danger)' }}>
+                                <XCircle size={18} />
+                                <span style={{ fontWeight: 600 }}>Filtering: Low Stock Items Only</span>
+                            </div>
+                            <button onClick={() => setAnalyticsFilter('all')} className="btn btn-ghost" style={{ fontSize: '0.8rem' }}>
+                                Clear Filter
+                            </button>
+                        </div>
+                    )}
+
                     {/* Desktop Table View */}
-                    <div className="glass-card tablet-up" style={{ overflow: 'hidden', border: '1px solid var(--border-subtle)' }}>
-                        <div style={{ overflowX: 'auto' }}>
-                            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                                <thead>
-                                    <tr style={{ background: 'var(--bg-secondary)', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
-                                        <th style={{ padding: '12px 16px', width: '60px' }}>Swatch</th>
-                                        <th style={{ padding: '12px 16px', minWidth: '150px' }}>Design Name</th>
-                                        <th style={{ padding: '12px 16px', width: '100px' }}>Category</th>
-                                        {kidsSizes.map(s => <th key={s} style={{ padding: '12px 4px', textAlign: 'center', width: '45px' }}>{s}</th>)}
-                                        {adultSizes.map(s => <th key={s} style={{ padding: '12px 4px', textAlign: 'center', width: '45px', borderLeft: s === 'M' ? '1px solid var(--glass-border)' : 'none' }}>{s}</th>)}
-                                        <th style={{ padding: '12px 16px', textAlign: 'right', width: '100px' }}>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {filteredDesigns.map(design => (
-                                        <React.Fragment key={design.id}>
-                                            {(['men', 'women', 'boys', 'girls'] as const).map((cat, idx) => (
-                                                <tr key={`${design.id}-${cat}`} style={{
-                                                    borderBottom: idx === 3 ? '2px solid var(--border-subtle)' : '1px solid var(--border-subtle)',
-                                                    transition: 'background 0.2s'
-                                                }}>
-                                                    {idx === 0 && (
-                                                        <>
-                                                            <td rowSpan={4} style={{ padding: '16px', verticalAlign: 'top' }}>
-                                                                <div
-                                                                    style={{ position: 'relative', width: '40px', height: '40px', cursor: 'pointer' }}
-                                                                    onClick={() => downloadSingleImage(design.imageUrl, design.name)}
-                                                                    title="Download this image"
-                                                                >
-                                                                    <img src={design.imageUrl} style={{ width: '100%', height: '100%', borderRadius: '4px', objectFit: 'cover', border: '1px solid var(--glass-border)' }} alt="" />
-                                                                    <div style={{
-                                                                        position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)',
-                                                                        display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px',
-                                                                        opacity: 0, transition: 'opacity 0.2s'
-                                                                    }} onMouseEnter={(e) => e.currentTarget.style.opacity = '1'} onMouseLeave={(e) => e.currentTarget.style.opacity = '0'}>
-                                                                        <Download size={14} color="white" />
+                    <div className="tablet-up desktop-full-width-inventory" style={{ padding: '0 max(16px, 2vw)' }}>
+                        <div className="glass-card" style={{ overflow: 'hidden', border: '1px solid var(--border-subtle)' }}>
+                            <div style={{ overflowX: 'auto' }}>
+                                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                                    <thead>
+                                        <tr style={{ background: 'var(--bg-secondary)', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+                                            <th style={{ padding: '12px 16px', width: '60px' }}>Swatch</th>
+                                            <th style={{ padding: '12px 16px', minWidth: '150px' }}>Design Name</th>
+                                            <th style={{ padding: '12px 16px', width: '100px' }}>Category</th>
+                                            {kidsSizes.map(s => <th key={s} style={{ padding: '12px 4px', textAlign: 'center', width: '45px' }}>{s}</th>)}
+                                            {adultSizes.map(s => <th key={s} style={{ padding: '12px 4px', textAlign: 'center', width: '45px', borderLeft: s === 'M' ? '1px solid var(--glass-border)' : 'none' }}>{s}</th>)}
+                                            <th style={{ padding: '12px 16px', textAlign: 'right', width: '100px' }}>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {filteredDesigns.map(design => (
+                                            <React.Fragment key={design.id}>
+                                                {(['men', 'women', 'boys', 'girls'] as const).map((cat, idx) => (
+                                                    <tr key={`${design.id}-${cat}`} style={{
+                                                        borderBottom: idx === 3 ? '2px solid var(--border-subtle)' : '1px solid var(--border-subtle)',
+                                                        transition: 'background 0.2s'
+                                                    }}>
+                                                        {idx === 0 && (
+                                                            <>
+                                                                <td rowSpan={4} className="swatch-col" style={{ padding: '16px', verticalAlign: 'top' }}>
+                                                                    <div
+                                                                        style={{ position: 'relative', width: '40px', height: '40px', cursor: 'pointer' }}
+                                                                        onClick={async () => {
+                                                                            try {
+                                                                                await downloadSingleImage(design.imageUrl, design.name);
+                                                                                showNotification('Image downloaded successfully.', 'success');
+                                                                            } catch (error) {
+                                                                                showNotification('Failed to download image. Check CORS settings.', 'error');
+                                                                            }
+                                                                        }}
+                                                                        title="Download this image"
+                                                                    >
+                                                                        <img src={design.imageUrl} style={{ width: '100%', height: '100%', borderRadius: '4px', objectFit: 'cover', border: '1px solid var(--glass-border)' }} alt="" />
+                                                                        <div style={{
+                                                                            position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)',
+                                                                            display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px',
+                                                                            opacity: 0, transition: 'opacity 0.2s'
+                                                                        }} onMouseEnter={(e) => e.currentTarget.style.opacity = '1'} onMouseLeave={(e) => e.currentTarget.style.opacity = '0'}>
+                                                                            <Download size={14} color="white" />
+                                                                        </div>
                                                                     </div>
+                                                                </td>
+                                                                <td rowSpan={4} style={{ padding: '16px', verticalAlign: 'top', minWidth: '180px' }}>
+                                                                    <div style={{ fontWeight: 800, fontSize: '1.2rem', color: 'var(--text-main)', letterSpacing: '-0.02em' }}>{design.name}</div>
+                                                                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '4px', fontWeight: 500 }}>{design.color} | {design.fabric}</div>
+                                                                </td>
+                                                            </>
+                                                        )}
+                                                        <td style={{ padding: '8px 16px', textTransform: 'uppercase', fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)' }}>
+                                                            {cat}
+                                                        </td>
+                                                        {kidsSizes.map(size => (
+                                                            <td key={size} style={{ padding: 0, borderRight: '1px solid rgba(255,255,255,0.02)' }}>
+                                                                {('boys' === cat || 'girls' === cat) ? (
+                                                                    <InlineInput
+                                                                        value={(design.inventory[cat] as any)[size]}
+                                                                        onUpdate={(newVal) => updateInventory(design.id, cat, size, newVal)}
+                                                                    />
+                                                                ) : <div style={{ opacity: 0.1, textAlign: 'center' }}>-</div>}
+                                                            </td>
+                                                        ))}
+                                                        {adultSizes.map(size => (
+                                                            <td key={size} style={{ padding: 0, borderLeft: size === 'M' ? '1px solid var(--glass-border)' : 'none', borderRight: '1px solid rgba(255,255,255,0.02)' }}>
+                                                                {('men' === cat || 'women' === cat) ? (
+                                                                    <InlineInput
+                                                                        value={(design.inventory[cat] as any)[size]}
+                                                                        onUpdate={(newVal) => updateInventory(design.id, cat, size, newVal)}
+                                                                    />
+                                                                ) : <div style={{ opacity: 0.1, textAlign: 'center' }}>-</div>}
+                                                            </td>
+                                                        ))}
+                                                        {idx === 0 && (
+                                                            <td rowSpan={4} className="actions-col" style={{ padding: '16px', textAlign: 'right', verticalAlign: 'top' }}>
+                                                                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                                                                    <button onClick={() => onEdit(design)} className="btn btn-ghost" style={{ padding: '6px' }} title="Edit Details">
+                                                                        <Edit2 size={14} />
+                                                                    </button>
+                                                                    <button onClick={() => setDeleteId(design.id)} className="btn btn-ghost" style={{ padding: '6px', color: 'var(--danger)' }} title="Delete Design">
+                                                                        <Trash2 size={14} />
+                                                                    </button>
                                                                 </div>
                                                             </td>
-                                                            <td rowSpan={4} style={{ padding: '16px', verticalAlign: 'top' }}>
-                                                                <div style={{ fontWeight: 700, fontSize: '1rem' }}>{design.name}</div>
-                                                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>{design.fabric} | {design.color}</div>
-                                                            </td>
-                                                        </>
-                                                    )}
-                                                    <td style={{ padding: '8px 16px', textTransform: 'uppercase', fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)' }}>
-                                                        {cat}
-                                                    </td>
-                                                    {kidsSizes.map(size => (
-                                                        <td key={size} style={{ padding: 0, borderRight: '1px solid rgba(255,255,255,0.02)' }}>
-                                                            {('boys' === cat || 'girls' === cat) ? (
-                                                                <InlineInput
-                                                                    value={(design.inventory[cat] as any)[size]}
-                                                                    onUpdate={(newVal) => updateInventory(design.id, cat, size, newVal)}
-                                                                />
-                                                            ) : <div style={{ opacity: 0.1, textAlign: 'center' }}>-</div>}
-                                                        </td>
-                                                    ))}
-                                                    {adultSizes.map(size => (
-                                                        <td key={size} style={{ padding: 0, borderLeft: size === 'M' ? '1px solid var(--glass-border)' : 'none', borderRight: '1px solid rgba(255,255,255,0.02)' }}>
-                                                            {('men' === cat || 'women' === cat) ? (
-                                                                <InlineInput
-                                                                    value={(design.inventory[cat] as any)[size]}
-                                                                    onUpdate={(newVal) => updateInventory(design.id, cat, size, newVal)}
-                                                                />
-                                                            ) : <div style={{ opacity: 0.1, textAlign: 'center' }}>-</div>}
-                                                        </td>
-                                                    ))}
-                                                    {idx === 0 && (
-                                                        <td rowSpan={4} style={{ padding: '16px', textAlign: 'right', verticalAlign: 'top' }}>
-                                                            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                                                                <button onClick={() => onEdit(design)} className="btn btn-ghost" style={{ padding: '6px' }} title="Edit Details">
-                                                                    <Edit2 size={14} />
-                                                                </button>
-                                                                <button onClick={() => setDeleteId(design.id)} className="btn btn-ghost" style={{ padding: '6px', color: 'var(--danger)' }} title="Delete Design">
-                                                                    <Trash2 size={14} />
-                                                                </button>
-                                                            </div>
-                                                        </td>
-                                                    )}
-                                                </tr>
-                                            ))}
-                                        </React.Fragment>
-                                    ))}
-                                </tbody>
-                            </table>
+                                                        )}
+                                                    </tr>
+                                                ))}
+                                            </React.Fragment>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
 
                     {/* Mobile Card View */}
-                    <div className="mobile-only" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    <div className="mobile-only" style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }}>
                         {filteredDesigns.map(design => (
-                            <div key={design.id} className="glass-card" style={{ padding: '16px' }}>
+                            <div key={design.id} className="glass-card" style={{
+                                padding: '16px',
+                                width: '100%',
+                                borderRadius: 0,
+                                borderLeft: 'none',
+                                borderRight: 'none'
+                            }}>
                                 <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
                                     <img src={design.imageUrl} style={{ width: '60px', height: '60px', borderRadius: '8px', objectFit: 'cover' }} alt="" />
                                     <div>
@@ -527,52 +485,76 @@ Status: ${order.status.toUpperCase()}
                 </>
             )}
 
-            {viewMode === 'orders' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    {orderView === 'active' ? (
-                        pendingOrders.length === 0 ? (
+            {
+                viewMode === 'orders' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        {(orderView === 'active' ? pendingOrders : historyOrders).length === 0 ? (
                             <div style={{ textAlign: 'center', padding: '100px', opacity: 0.5 }}>
                                 <Clock size={48} style={{ marginBottom: '16px' }} />
-                                <p>No pending orders at the moment.</p>
+                                <p>No {orderView} orders at the moment.</p>
                             </div>
                         ) : (
-                            pendingOrders.map(order => (
-                                <div key={order.id} className="glass-card" style={{ padding: 'max(16px, 3vw)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px', border: '1px solid var(--border-subtle)' }}>
-                                    <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
-                                        <div style={{ background: 'var(--primary)', color: 'white', padding: '10px', borderRadius: '12px', flexShrink: 0 }}>
-                                            <ShoppingBag size={20} />
+                            (orderView === 'active' ? pendingOrders : historyOrders).map(order => (
+                                <div key={order.id} className="glass-card" style={{ padding: 'max(16px, 3vw)', display: 'flex', flexDirection: 'column', gap: '20px', border: '1px solid var(--border-subtle)', position: 'relative' }}>
+                                    {orderView === 'history' && (
+                                        <div style={{ position: 'absolute', top: '16px', right: '16px' }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedOrderIds.has(order.id)}
+                                                onChange={() => handleToggleSelect(order.id)}
+                                                style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+                                            />
                                         </div>
-                                        <div style={{ minWidth: '200px', flexGrow: 1 }}>
-                                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '4px' }}>
-                                                Order #{order.id.slice(-6).toUpperCase()} • {new Date(order.createdAt).toLocaleTimeString()}
+                                    )}
+                                    <div style={{ display: 'flex', gap: 'max(12px, 2vw)', marginBottom: '16px', flexDirection: window.innerWidth < 640 ? 'column' : 'row' }}>
+                                        <div style={{ width: window.innerWidth < 640 ? '100%' : '100px', flexShrink: 0 }}>
+                                            <img
+                                                src={designs.find(d => d.id === order.designId)?.imageUrl}
+                                                style={{ width: '100%', aspectRatio: '1/1', borderRadius: '12px', objectFit: 'cover', border: '1px solid var(--border-subtle)' }}
+                                                alt=""
+                                            />
+                                        </div>
+                                        <div style={{ flexGrow: 1, minWidth: 0 }}>
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                                Order #{order.id.slice(-6).toUpperCase()} • {new Date(order.createdAt).toLocaleDateString()}
                                             </div>
-                                            <h3 style={{ margin: 0 }}>
-                                                {designs.find(d => d.id === order.designId)?.name || 'Unknown Design'}
-                                            </h3>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '8px' }}>
+                                                <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }}>
+                                                    {designs.find(d => d.id === order.designId)?.name || 'Unknown Design'}
+                                                </h3>
+                                                {orderView === 'history' && (
+                                                    <span className={`badge ${order.status === 'accepted' ? 'badge-success' : 'badge-danger'}`} style={{
+                                                        borderRadius: '6px',
+                                                        padding: '4px 10px',
+                                                        fontSize: '0.7rem',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '4px'
+                                                    }}>
+                                                        {order.status === 'accepted' ? <CheckCircle2 size={12} /> : <XCircle size={12} />}
+                                                        {order.status?.toUpperCase()}
+                                                    </span>
+                                                )}
+                                            </div>
 
                                             {/* Customer Details */}
-                                            <div style={{ marginTop: '8px', padding: '8px', background: 'var(--bg-secondary)', borderRadius: '8px', fontSize: '0.85rem' }}>
-                                                <div style={{ fontWeight: 600, marginBottom: '4px' }}>Customer Details:</div>
-                                                <div>{order.customerName}</div>
-                                                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{order.customerEmail}</div>
-                                                <div>{order.customerCountryCode && <span style={{ color: 'var(--text-muted)', marginRight: '4px' }}>{order.customerCountryCode}</span>}{order.customerPhone}</div>
-                                                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{order.customerAddress}</div>
+                                            <div style={{ marginTop: '12px', padding: '12px', background: 'var(--bg-secondary)', borderRadius: '12px', fontSize: '0.85rem', border: '1px solid var(--border-subtle)' }}>
+                                                <div style={{ fontWeight: 700, marginBottom: '6px', fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Customer Details</div>
+                                                <div style={{ fontWeight: 600 }}>{order.customerName}</div>
+                                                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', wordBreak: 'break-all' }}>{order.customerEmail}</div>
+                                                <div style={{ margin: '4px 0' }}>{order.customerCountryCode && <span style={{ color: 'var(--text-muted)', marginRight: '4px' }}>{order.customerCountryCode}</span>}{order.customerPhone}</div>
+                                                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>{order.customerAddress}</div>
                                             </div>
 
-                                            <div style={{ display: 'flex', gap: '12px', marginTop: '8px', flexWrap: 'wrap' }}>
-                                                <span className="badge badge-info">{order.comboType}</span>
+                                            <div style={{ display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'wrap' }}>
+                                                <span className="badge badge-info" style={{ borderRadius: '6px', padding: '4px 10px', fontSize: '0.7rem' }}>{order.comboType}</span>
                                                 {Object.entries(order.selectedSizes)
                                                     .filter(([_, size]) => size !== 'N/A')
                                                     .map(([member, size]) => (
                                                         <div key={member} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                                            <span style={{ fontSize: '0.8rem', color: 'var(--text-main)', background: 'rgba(0,0,0,0.05)', padding: '2px 8px', borderRadius: '4px' }}>
-                                                                {member}: <strong>{size}</strong>
+                                                            <span style={{ fontSize: '0.75rem', color: 'var(--text-main)', background: 'white', padding: '4px 10px', borderRadius: '6px', border: '1px solid var(--border-subtle)', fontWeight: 600 }}>
+                                                                {member}: {size}
                                                             </span>
-                                                            {order.notes?.[member] && (
-                                                                <span style={{ fontSize: '0.7rem', color: 'var(--primary)', fontStyle: 'italic', maxWidth: '150px' }}>
-                                                                    "{order.notes[member]}"
-                                                                </span>
-                                                            )}
                                                         </div>
                                                     ))}
                                             </div>
@@ -582,347 +564,246 @@ Status: ${order.status.toUpperCase()}
                                         <button
                                             onClick={() => downloadOrder(order)}
                                             className="btn btn-ghost btn-download"
-                                            style={{ flexGrow: 1, justifyContent: 'center', fontSize: '0.85rem' }}
+                                            style={{ flexGrow: 1, justifyContent: 'center', fontSize: '0.8rem', padding: '8px' }}
                                         >
-                                            Download Invoice
+                                            Invoice PDF
                                         </button>
                                         <button
-                                            onClick={() => {
+                                            onClick={async () => {
                                                 const design = designs.find(d => d.id === order.designId);
-                                                if (design) downloadSingleImage(design.imageUrl, design.name);
+                                                if (design) {
+                                                    try {
+                                                        await downloadSingleImage(design.imageUrl, design.name);
+                                                        showNotification('Image downloaded successfully.', 'success');
+                                                    } catch (error) {
+                                                        showNotification('Failed to download image. Check CORS settings.', 'error');
+                                                    }
+                                                } else {
+                                                    showNotification('Design information not found for this order.', 'error');
+                                                }
                                             }}
                                             className="btn btn-ghost btn-download"
-                                            style={{ flexGrow: 1, justifyContent: 'center', fontSize: '0.85rem' }}
+                                            style={{ flexGrow: 1, justifyContent: 'center', fontSize: '0.8rem', padding: '8px' }}
                                         >
-                                            Download Dress Image
+                                            Dress Image
                                         </button>
-                                        <button
-                                            onClick={() => onRejectOrder(order.id)}
-                                            className="btn btn-ghost btn-reject" style={{ color: 'var(--danger)', gap: '8px', flexGrow: 1, justifyContent: 'center', fontSize: '0.85rem' }}
-                                        >
-                                            <XCircle size={18} />
-                                            Reject
-                                        </button>
-                                        <button
-                                            onClick={() => onAcceptOrder(order)}
-                                            className="btn btn-primary" style={{ gap: '8px', padding: '12px 32px', flexGrow: 2, justifyContent: 'center' }}
-                                        >
-                                            <CheckCircle2 size={18} />
-                                            Accept
-                                        </button>
+                                        {orderView === 'active' && (
+                                            <>
+                                                <button
+                                                    onClick={() => onRejectOrder(order.id)}
+                                                    className="btn btn-ghost btn-reject" style={{ color: 'var(--danger)', gap: '8px', flexGrow: 1, justifyContent: 'center', fontSize: '0.85rem' }}
+                                                >
+                                                    <XCircle size={18} />
+                                                    Reject
+                                                </button>
+                                                <button
+                                                    onClick={() => onAcceptOrder(order)}
+                                                    className="btn btn-primary" style={{ gap: '8px', padding: '12px 32px', flexGrow: 2, justifyContent: 'center' }}
+                                                >
+                                                    <CheckCircle2 size={18} />
+                                                    Accept
+                                                </button>
+                                            </>
+                                        )}
                                     </div>
                                 </div>
                             ))
-                        )
-                    ) : (
-                        historyOrders.length === 0 ? (
-                            <div style={{ textAlign: 'center', padding: '100px', opacity: 0.5 }}>
-                                <Clock size={48} style={{ marginBottom: '16px' }} />
-                                <p>No order history found.</p>
-                            </div>
-                        ) : (
-                            historyOrders.map(order => (
-                                <div key={order.id} className="glass-card" style={{ padding: 'max(16px, 3vw)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px', border: '1px solid var(--border-subtle)', opacity: 0.9 }}>
-                                    <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center' }}>
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedOrders.has(order.id)}
-                                                onChange={(e) => {
-                                                    const newSelected = new Set(selectedOrders);
-                                                    if (e.target.checked) newSelected.add(order.id);
-                                                    else newSelected.delete(order.id);
-                                                    setSelectedOrders(newSelected);
-                                                }}
-                                                style={{ width: '18px', height: '18px', marginRight: '12px', cursor: 'pointer', accentColor: 'var(--primary)' }}
-                                            />
-                                        </div>
-                                        <div style={{
-                                            background: order.status === 'accepted' ? 'var(--success, #10b981)' : 'var(--danger, #ef4444)',
-                                            color: 'white', padding: '10px', borderRadius: '12px', flexShrink: 0
-                                        }}>
-                                            {order.status === 'accepted' ? <CheckCircle2 size={20} /> : <XCircle size={20} />}
-                                        </div>
-                                        <div style={{ minWidth: '200px', flexGrow: 1 }}>
-                                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '4px' }}>
-                                                Order #{order.id.slice(-6).toUpperCase()} • {new Date(order.createdAt).toLocaleDateString()} {new Date(order.createdAt).toLocaleTimeString()}
-                                            </div>
-                                            <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                {designs.find(d => d.id === order.designId)?.name || 'Unknown Design'}
-                                                <span style={{
-                                                    fontSize: '0.75rem',
-                                                    padding: '2px 8px',
-                                                    borderRadius: '4px',
-                                                    background: order.status === 'accepted' ? '#dcfce7' : '#fee2e2',
-                                                    color: order.status === 'accepted' ? '#166534' : '#991b1b',
-                                                    textTransform: 'uppercase',
-                                                    fontWeight: 700
-                                                }}>
-                                                    {order.status}
-                                                </span>
-                                            </h3>
+                        )}
+                    </div>
+                )
+            }
 
-                                            {/* Customer Details */}
-                                            <div style={{ marginTop: '8px', padding: '8px', background: 'var(--bg-secondary)', borderRadius: '8px', fontSize: '0.85rem' }}>
-                                                <div style={{ fontWeight: 600, marginBottom: '4px' }}>Customer Details:</div>
-                                                <div>{order.customerName}</div>
-                                                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{order.customerEmail}</div>
-                                                <div>{order.customerCountryCode && <span style={{ color: 'var(--text-muted)', marginRight: '4px' }}>{order.customerCountryCode}</span>}{order.customerPhone}</div>
-                                                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{order.customerAddress}</div>
-                                            </div>
-
-                                            <div style={{ display: 'flex', gap: '12px', marginTop: '8px', flexWrap: 'wrap' }}>
-                                                <span className="badge badge-info">{order.comboType}</span>
-                                                {Object.entries(order.selectedSizes)
-                                                    .filter(([_, size]) => size !== 'N/A')
-                                                    .map(([member, size]) => (
-                                                        <div key={member} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                                            <span style={{ fontSize: '0.8rem', color: 'var(--text-main)', background: 'rgba(0,0,0,0.05)', padding: '2px 8px', borderRadius: '4px' }}>
-                                                                {member}: <strong>{size}</strong>
-                                                            </span>
-                                                        </div>
-                                                    ))}
-                                            </div>
-                                        </div>
+            {
+                viewMode === 'gallery' && (
+                    <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                        gap: '24px',
+                        paddingBottom: '80px' // Space for mobile FAB
+                    }}>
+                        {filteredDesigns.map(design => (
+                            <div key={design.id} className="glass-card" style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                                <div style={{ position: 'relative', paddingTop: '100%' }}>
+                                    <img
+                                        src={design.imageUrl}
+                                        alt={design.name}
+                                        style={{
+                                            position: 'absolute',
+                                            top: 0,
+                                            left: 0,
+                                            width: '100%',
+                                            height: '100%',
+                                            objectFit: 'cover'
+                                        }}
+                                    />
+                                    <div style={{
+                                        position: 'absolute',
+                                        top: '12px',
+                                        right: '12px',
+                                        display: 'flex',
+                                        gap: '8px'
+                                    }}>
+                                        <button
+                                            onClick={() => downloadSingleImage(design.imageUrl, design.name)}
+                                            className="btn glass-card"
+                                            style={{ padding: '8px', borderRadius: '50%', background: 'rgba(255,255,255,0.9)' }}
+                                            title="Download Image"
+                                        >
+                                            <Download size={16} color="var(--text-main)" />
+                                        </button>
                                     </div>
-                                    <div style={{ display: 'flex', gap: '8px', width: '100%', justifyContent: 'flex-end', flexWrap: 'wrap', marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--border-subtle)' }}>
+                                </div>
+
+                                <div style={{ padding: '16px', flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+                                    <h3 style={{ margin: '0 0 4px 0', fontSize: '1.1rem' }}>{design.name}</h3>
+                                    <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                                        {design.color} • {design.fabric}
+                                    </p>
+
+                                    <div style={{ marginTop: 'auto', paddingTop: '16px', display: 'flex', gap: '8px' }}>
                                         <button
-                                            onClick={() => downloadOrder(order)}
-                                            className="btn btn-ghost btn-download"
-                                            style={{ flexGrow: 1, justifyContent: 'center', fontSize: '0.85rem', minWidth: '140px' }}
+                                            onClick={() => onEdit(design)}
+                                            className="btn btn-secondary"
+                                            style={{ flexGrow: 1, justifyContent: 'center' }}
                                         >
-                                            <Download size={16} />
-                                            Invoice
+                                            <Edit2 size={16} /> Edit
                                         </button>
                                         <button
-                                            onClick={() => {
-                                                const design = designs.find(d => d.id === order.designId);
-                                                if (design) downloadSingleImage(design.imageUrl, design.name);
-                                            }}
-                                            className="btn btn-ghost btn-download"
-                                            style={{ flexGrow: 1, justifyContent: 'center', fontSize: '0.85rem', minWidth: '140px' }}
-                                        >
-                                            <Images size={16} />
-                                            Dress Image
-                                        </button>
-                                        <button
-                                            onClick={() => setDeleteOrderId(order.id)}
+                                            onClick={() => setDeleteId(design.id)}
                                             className="btn btn-ghost"
-                                            style={{ color: 'var(--danger)', flexGrow: 0, justifyContent: 'center', fontSize: '0.85rem', padding: '8px' }}
-                                            title="Delete Order Record"
+                                            style={{ color: 'var(--danger)', padding: '8px' }}
+                                            title="Delete"
                                         >
                                             <Trash2 size={18} />
                                         </button>
                                     </div>
                                 </div>
-                            ))
-                        )
-                    )}
-                </div>
-            )}
-
-            {viewMode === 'gallery' && (
-                <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                    gap: '24px',
-                    paddingBottom: '80px' // Space for mobile FAB
-                }}>
-                    {filteredDesigns.map(design => (
-                        <div key={design.id} className="glass-card" style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                            <div style={{ position: 'relative', paddingTop: '100%' }}>
-                                <img
-                                    src={design.imageUrl}
-                                    alt={design.name}
-                                    style={{
-                                        position: 'absolute',
-                                        top: 0,
-                                        left: 0,
-                                        width: '100%',
-                                        height: '100%',
-                                        objectFit: 'cover'
-                                    }}
-                                />
-                                <div style={{
-                                    position: 'absolute',
-                                    top: '12px',
-                                    right: '12px',
-                                    display: 'flex',
-                                    gap: '8px'
-                                }}>
-                                    <button
-                                        onClick={() => downloadSingleImage(design.imageUrl, design.name)}
-                                        className="btn glass-card"
-                                        style={{ padding: '8px', borderRadius: '50%', background: 'rgba(255,255,255,0.9)' }}
-                                        title="Download Image"
-                                    >
-                                        <Download size={16} color="var(--text-main)" />
-                                    </button>
-                                </div>
                             </div>
-
-                            <div style={{ padding: '16px', flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
-                                <h3 style={{ margin: '0 0 4px 0', fontSize: '1.1rem' }}>{design.name}</h3>
-                                <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-                                    {design.color} • {design.fabric}
-                                </p>
-
-                                <div style={{ marginTop: 'auto', paddingTop: '16px', display: 'flex', gap: '8px' }}>
-                                    <button
-                                        onClick={() => onEdit(design)}
-                                        className="btn btn-secondary"
-                                        style={{ flexGrow: 1, justifyContent: 'center' }}
-                                    >
-                                        <Edit2 size={16} /> Edit
-                                    </button>
-                                    <button
-                                        onClick={() => setDeleteId(design.id)}
-                                        className="btn btn-ghost"
-                                        style={{ color: 'var(--danger)', padding: '8px' }}
-                                        title="Delete"
-                                    >
-                                        <Trash2 size={18} />
-                                    </button>
-                                </div>
+                        ))}
+                        {filteredDesigns.length === 0 && (
+                            <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '60px', color: 'var(--text-muted)' }}>
+                                <Images size={48} style={{ opacity: 0.2, marginBottom: '16px' }} />
+                                <p>No designs found matching your search.</p>
                             </div>
-                        </div>
-                    ))}
-                    {filteredDesigns.length === 0 && (
-                        <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '60px', color: 'var(--text-muted)' }}>
-                            <Images size={48} style={{ opacity: 0.2, marginBottom: '16px' }} />
-                            <p>No designs found matching your search.</p>
-                        </div>
-                    )}
-                </div>
-            )}
+                        )}
+                    </div>
+                )
+            }
 
             {/* Mobile FAB */}
-            {viewMode === 'inventory' && (
-                <button onClick={onAddNew} className="fab mobile-only">
-                    <Plus size={28} />
-                </button>
-            )}
+            {
+                viewMode === 'inventory' && (
+                    <button onClick={onAddNew} className="fab mobile-only">
+                        <Plus size={28} />
+                    </button>
+                )
+            }
 
-            {/* Custom Confirmation Modal for Design Deletion */}
-            {deleteId && (
-                <div style={{
-                    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'
-                }}>
+            {/* Custom Confirmation Modal */}
+            {
+                deleteId && (
                     <div style={{
-                        background: 'var(--bg-main)', padding: '24px', borderRadius: '16px',
-                        maxWidth: '400px', width: '100%', boxShadow: 'var(--shadow-lg)'
+                        position: 'fixed', inset: 0,
+                        background: 'rgba(0,0,0,0.4)',
+                        backdropFilter: 'blur(8px)',
+                        zIndex: 2000,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px',
+                        animation: 'fadeIn 0.2s ease-out'
                     }}>
-                        <h3 style={{ margin: '0 0 12px 0', fontSize: '1.2rem' }}>Confirm Deletion</h3>
-                        <p style={{ color: 'var(--text-muted)', marginBottom: '24px', lineHeight: '1.5' }}>
-                            Are you sure you want to delete this design? This action cannot be undone.
-                        </p>
-                        <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-                            <button
-                                onClick={() => setDeleteId(null)}
-                                className="btn btn-ghost"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={() => {
-                                    if (deleteId) deleteDesign(deleteId);
-                                    setDeleteId(null);
-                                }}
-                                className="btn btn-primary"
-                                style={{ background: 'var(--danger)', borderColor: 'var(--danger)' }}
-                            >
-                                Delete
-                            </button>
+                        <div className="glass-card" style={{
+                            padding: '32px',
+                            maxWidth: '440px',
+                            width: '100%',
+                            boxShadow: 'var(--shadow-xl)',
+                            textAlign: 'center',
+                            animation: 'slideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)'
+                        }}>
+                            <div style={{
+                                width: '64px', height: '64px',
+                                background: '#fef2f2', color: '#ef4444',
+                                borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                margin: '0 auto 20px'
+                            }}>
+                                <Trash2 size={32} />
+                            </div>
+                            <h3 style={{ margin: '0 0 12px 0', fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-main)' }}>Delete Design?</h3>
+                            <p style={{ color: 'var(--text-muted)', marginBottom: '32px', lineHeight: '1.6', fontSize: '0.95rem' }}>
+                                Are you sure you want to delete <strong style={{ color: 'var(--text-main)' }}>{designs.find(d => d.id === deleteId)?.name}</strong>? This action will permanently remove it from the inventory.
+                            </p>
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                                <button
+                                    onClick={() => setDeleteId(null)}
+                                    className="btn btn-secondary"
+                                    style={{ flex: 1, padding: '12px' }}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        if (deleteId) deleteDesign(deleteId);
+                                        setDeleteId(null);
+                                    }}
+                                    className="btn btn-primary"
+                                    style={{ flex: 1, padding: '12px', background: '#ef4444', borderColor: '#ef4444' }}
+                                >
+                                    Delete Now
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
-            {/* Custom Confirmation Modal for Order Deletion */}
-            {deleteOrderId && (
-                <div style={{
-                    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'
-                }}>
+            {/* Bulk Delete Confirmation Modal */}
+            {
+                showBulkDeleteConfirm && (
                     <div style={{
-                        background: 'var(--bg-main)', padding: '24px', borderRadius: '16px',
-                        maxWidth: '400px', width: '100%', boxShadow: 'var(--shadow-lg)'
+                        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'
                     }}>
-                        <h3 style={{ margin: '0 0 12px 0', fontSize: '1.2rem' }}>Delete Order Record</h3>
-                        <p style={{ color: 'var(--text-muted)', marginBottom: '24px', lineHeight: '1.5' }}>
-                            Are you sure you want to delete this order from history? This action cannot be undone.
-                        </p>
-                        <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-                            <button
-                                onClick={() => setDeleteOrderId(null)}
-                                className="btn btn-ghost"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={() => {
-                                    if (deleteOrderId) {
-                                        onDeleteOrder(deleteOrderId);
-                                        // Also remove from selection if present
-                                        const newSelected = new Set(selectedOrders);
-                                        newSelected.delete(deleteOrderId);
-                                        setSelectedOrders(newSelected);
-                                    }
-                                    setDeleteOrderId(null);
-                                }}
-                                className="btn btn-primary"
-                                style={{ background: 'var(--danger)', borderColor: 'var(--danger)' }}
-                            >
-                                Delete
-                            </button>
+                        <div style={{
+                            background: 'var(--bg-main)', padding: '24px', borderRadius: '16px',
+                            maxWidth: '400px', width: '100%', boxShadow: 'var(--shadow-lg)'
+                        }}>
+                            <h3 style={{ margin: '0 0 12px 0', fontSize: '1.2rem' }}>Confirm Bulk Deletion</h3>
+                            <p style={{ color: 'var(--text-muted)', marginBottom: '24px', lineHeight: '1.5' }}>
+                                Are you sure you want to delete {selectedOrderIds.size} selected orders? This action cannot be undone.
+                            </p>
+                            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                                <button
+                                    onClick={() => setShowBulkDeleteConfirm(false)}
+                                    className="btn btn-ghost"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={async () => {
+                                        await onDeleteOrders(Array.from(selectedOrderIds));
+                                        setSelectedOrderIds(new Set());
+                                        setShowBulkDeleteConfirm(false);
+                                    }}
+                                    className="btn btn-primary"
+                                    style={{ background: 'var(--danger)', borderColor: 'var(--danger)' }}
+                                >
+                                    Delete {selectedOrderIds.size} Orders
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
-
-            {/* Custom Confirmation Modal for Bulk Deletion */}
-            {isBulkDeleting && onDeleteOrders && (
-                <div style={{
-                    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'
-                }}>
-                    <div style={{
-                        background: 'var(--bg-main)', padding: '24px', borderRadius: '16px',
-                        maxWidth: '400px', width: '100%', boxShadow: 'var(--shadow-lg)'
-                    }}>
-                        <h3 style={{ margin: '0 0 12px 0', fontSize: '1.2rem' }}>Delete Selected Orders ({selectedOrders.size})</h3>
-                        <p style={{ color: 'var(--text-muted)', marginBottom: '24px', lineHeight: '1.5' }}>
-                            Are you sure you want to delete these {selectedOrders.size} orders? This action cannot be undone.
-                        </p>
-                        <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-                            <button
-                                onClick={() => setIsBulkDeleting(false)}
-                                className="btn btn-ghost"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={async () => {
-                                    await onDeleteOrders(Array.from(selectedOrders));
-                                    setSelectedOrders(new Set());
-                                    setIsBulkDeleting(false);
-                                }}
-                                className="btn btn-primary"
-                                style={{ background: 'var(--danger)', borderColor: 'var(--danger)' }}
-                            >
-                                Delete All
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+                )
+            }
 
             <style>{`
                 .spin { animation: spin 1000ms linear infinite; }
                 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+                .btn-black-active { transition: all 0.2s; }
+                .btn-black-active:hover:not(:disabled),
+                .btn-black-active.active {
+                    background: #000000 !important;
+                    color: #ffffff !important;
+                }
             `}</style>
-        </div>
+        </div >
     );
 };
 

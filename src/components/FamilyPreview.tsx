@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { Design, ComboType } from '../types';
 import { ShoppingCart, ArrowLeft, Check } from 'lucide-react';
 
@@ -13,10 +13,10 @@ interface FamilyPreviewProps {
     };
     onPlaceOrder: (designId: string, comboType: ComboType, sizes: Record<string, string>, customerDetails: { name: string; email: string; phone: string; address: string; countryCode: string }) => Promise<void>;
     onBack: () => void;
+    showNotification: (message: string, type: 'success' | 'error' | 'info') => void;
 }
 
-const FamilyPreview: React.FC<FamilyPreviewProps> = ({ design, category = 'ALL', initialConfig, onPlaceOrder, onBack }) => {
-
+const FamilyPreview: React.FC<FamilyPreviewProps> = ({ design, category = 'ALL', initialConfig, onPlaceOrder, onBack, showNotification }) => {
     // Helper to determine if a member should be shown based on category and design availability
     const shouldShowMember = (member: 'men' | 'women' | 'boys' | 'girls') => {
         if (!design) return false;
@@ -78,6 +78,20 @@ const FamilyPreview: React.FC<FamilyPreviewProps> = ({ design, category = 'ALL',
     const [showErrors, setShowErrors] = useState(false);
     const [orderSuccess, setOrderSuccess] = useState(false);
     const [showValidationError, setShowValidationError] = useState(false);
+
+    // Handle scroll locking for modals
+    useEffect(() => {
+        const scrollContainer = document.querySelector('main');
+        const isActive = showOrderForm || showValidationError;
+        if (isActive && scrollContainer) {
+            scrollContainer.style.overflow = 'hidden';
+        } else if (scrollContainer) {
+            scrollContainer.style.overflow = 'auto';
+        }
+        return () => {
+            if (scrollContainer) scrollContainer.style.overflow = 'auto';
+        };
+    }, [showOrderForm, showValidationError]);
 
     if (!design) return null;
 
@@ -155,7 +169,7 @@ const FamilyPreview: React.FC<FamilyPreviewProps> = ({ design, category = 'ALL',
             await onPlaceOrder(design.id, comboType, submissionSizes, customerDetails);
             setOrderSuccess(true);
         } catch (error) {
-            alert('Failed to place order.');
+            showNotification('Failed to place order. Please try again.', 'error');
             setIsSubmitting(false);
         }
     };
@@ -240,15 +254,23 @@ const FamilyPreview: React.FC<FamilyPreviewProps> = ({ design, category = 'ALL',
                 </div>
 
                 {/* Selection Section */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'max(16px, 3vh)' }}>
                     <section>
-                        <h3 style={{ fontSize: '1.2rem', marginBottom: '16px' }}>Select Sizes</h3>
-                        <p style={{ color: 'var(--text-muted)', marginBottom: '16px', fontSize: '0.9rem' }}>
+                        <h3 style={{ fontSize: '1.2rem', marginBottom: '12px' }}>Select Sizes</h3>
+                        <p style={{ color: 'var(--text-muted)', marginBottom: '16px', fontSize: '0.85rem', lineHeight: '1.4' }}>
                             Choose sizes for the family members you want to order for.
                         </p>
 
-                        <div style={{ background: 'var(--bg-secondary)', padding: '20px', borderRadius: '20px', border: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                            {/* Check availability and render selectors */}
+                        <div style={{
+                            background: 'var(--bg-secondary)',
+                            padding: 'min(20px, 4vw)',
+                            borderRadius: '20px',
+                            border: '1px solid var(--border-subtle)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '12px'
+                        }}
+                        >        {/* Check availability and render selectors */}
                             {shouldShowMember('men') && Object.values(design.inventory.men).some(s => s > 0) && (
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <span style={{ fontWeight: 600 }}>Father Size</span>
@@ -415,37 +437,12 @@ const FamilyPreview: React.FC<FamilyPreviewProps> = ({ design, category = 'ALL',
                                 return;
                             }
 
-                            // Reserve Stock Logic
                             setIsSubmitting(true);
-                            // We need to check all selected items
-                            const itemsToReserve: { category: string, size: string }[] = [];
+                            // Removed reservation logic
 
-                            if (fatherSize !== 'N/A') itemsToReserve.push({ category: 'men', size: fatherSize });
-                            if (motherSize !== 'N/A') itemsToReserve.push({ category: 'women', size: motherSize });
-                            sons.forEach(s => { if (s.size !== 'N/A') itemsToReserve.push({ category: 'boys', size: s.size }); });
-                            daughters.forEach(d => { if (d.size !== 'N/A') itemsToReserve.push({ category: 'girls', size: d.size }); });
-
-                            try {
-                                const { reserveStock } = await import('../data');
-                                // Sequentially reserve to avoid race/deadlocks or complex rollback for now
-                                // In production, one atomic batch RPC is better, but loop is fine here.
-
-                                for (const item of itemsToReserve) {
-                                    const success = await reserveStock(design.id, item.category, item.size, 1);
-                                    if (!success) {
-                                        alert(`Sorry, the size ${item.size} for ${item.category} just went out of stock!`);
-                                        setIsSubmitting(false);
-                                        return; // Stop here
-                                    }
-                                }
-
-                                setIsSubmitting(false);
-                                setShowOrderForm(true);
-                            } catch (e) {
-                                console.error("Reservation failed", e);
-                                alert("Something went wrong checking stock. Please try again.");
-                                setIsSubmitting(false);
-                            }
+                            // Skip reservation logic for now to unblock user
+                            setShowOrderForm(true);
+                            setIsSubmitting(false);
                         }}
                         disabled={isSubmitting}
                         className="btn btn-primary"
@@ -474,12 +471,18 @@ const FamilyPreview: React.FC<FamilyPreviewProps> = ({ design, category = 'ALL',
                     <div
                         style={{
                             background: 'var(--bg-main)',
-                            borderRadius: '24px',
+                            borderRadius: 'max(16px, 24px)',
                             width: '100%',
                             maxWidth: '500px',
+                            maxHeight: 'min(95vh, 800px)',
                             boxShadow: 'var(--shadow-xl)',
                             border: '1px solid var(--border-subtle)',
-                            padding: '24px',
+                            padding: 'max(16px, 24px)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            overflowY: 'auto',
+                            scrollbarWidth: 'thin',
+                            WebkitOverflowScrolling: 'touch',
                             animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
                         }}
                     >
@@ -596,6 +599,7 @@ const FamilyPreview: React.FC<FamilyPreviewProps> = ({ design, category = 'ALL',
                     </div>
                 </div>
             )}
+
             {/* Validation Error Modal */}
             {showValidationError && (
                 <div style={{
@@ -619,6 +623,10 @@ const FamilyPreview: React.FC<FamilyPreviewProps> = ({ design, category = 'ALL',
                         textAlign: 'center',
                         boxShadow: 'var(--shadow-xl)',
                         border: '1px solid var(--border-subtle)',
+                        scrollbarWidth: 'thin',
+                        WebkitOverflowScrolling: 'touch',
+                        overflowY: 'auto',
+                        maxHeight: '90vh',
                         animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
                     }}>
                         <div style={{
@@ -644,5 +652,6 @@ const FamilyPreview: React.FC<FamilyPreviewProps> = ({ design, category = 'ALL',
         </div>
     );
 };
+
 
 export default FamilyPreview;

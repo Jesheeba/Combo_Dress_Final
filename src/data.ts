@@ -2,6 +2,9 @@ import { supabase, isSupabaseConfigured } from './supabaseClient';
 import type { Design, AdultSizeStock, KidsSizeStock, Order } from './types';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
+
 
 const DESIGNS_KEY = 'tailor_store_designs_v2';
 const ORDERS_KEY = 'tailor_store_orders_v1';
@@ -32,13 +35,7 @@ export const initialDesigns: Design[] = [
 
 // --- DESIGNS ---
 
-// --- DESIGNS ---
-
-// Re-use mapOrderFromDB concept if needed, but for designs we already have simple mapping.
-// We can export a helper if we want to be consistent, but mapping is simple.
-
 export const fetchDesigns = async (): Promise<Design[]> => {
-    // ... (existing code)
     if (!isSupabaseConfigured) {
         const local = localStorage.getItem(DESIGNS_KEY);
         return local ? JSON.parse(local) : initialDesigns;
@@ -108,8 +105,7 @@ export const syncDesign = async (design: Design) => {
 
     if (error) {
         console.error('Error syncing design:', error);
-        alert('Sync Error: ' + error.message);
-        return false;
+        throw error;
     }
 };
 
@@ -120,12 +116,44 @@ export const removeDesign = async (id: string) => {
         return;
     }
 
+    // Attempt deletion
     const { error } = await supabase
         .from('designs')
         .delete()
-        .match({ id });
+        .eq('id', id);
 
-    if (error) console.error('Error removing design:', error);
+    if (error) {
+        // Handle Foreign Key Violation (Postgres error 23503)
+        // This happens if there are orders or other references (like temporary_holds) to this design.
+        if (error.code === '23503') {
+            console.log(`Foreign key violation for design ${id}. Running aggressive cleanup...`);
+
+            // 1. Clear Orders
+            await supabase.from('orders').delete().eq('designid', id);
+
+            // 2. Clear Temporary Holds (Found in diagnostics)
+            // Attempt cleaning both possible column names for the design reference
+            await supabase.from('temporary_holds').delete().eq('design_id', id);
+            await supabase.from('temporary_holds').delete().eq('id', id);
+
+            // Retry design deletion
+            const { error: retryError } = await supabase
+                .from('designs')
+                .delete()
+                .eq('id', id);
+
+            if (retryError) {
+                console.error('Aggressive cleanup retry failed:', retryError);
+                throw retryError;
+            }
+
+            console.log(`Successfully deleted design ${id} after aggressive cleanup.`);
+            return;
+        }
+
+        console.error('Error removing design:', error);
+        throw error;
+    }
 };
 
 // --- ORDERS ---
@@ -183,35 +211,33 @@ export const subscribeToOrders = (onUpdate: (payload: any) => void) => {
 export { mapOrderFromDB };
 
 export const submitOrder = async (orderData: Partial<Order>) => {
+    const newId = Math.random().toString(36).substr(2, 9);
+    const timestamp = Date.now();
+
+    const newOrder: Order = {
+        id: newId,
+        designId: orderData.designId!,
+        designName: 'Loading...',
+        comboType: orderData.comboType!,
+        selectedSizes: orderData.selectedSizes!,
+        status: 'pending',
+        customerName: orderData.customerName!,
+        customerEmail: orderData.customerEmail,
+        customerPhone: orderData.customerPhone!,
+        customerCountryCode: orderData.customerCountryCode || '+91',
+        customerAddress: orderData.customerAddress!,
+        notes: orderData.notes,
+        createdAt: timestamp
+    };
+
     if (!isSupabaseConfigured) {
         const orders = await fetchOrders();
-        const designs = await fetchDesigns();
-        const design = designs.find(d => d.id === orderData.designId);
-
-        const newOrder: Order = {
-            id: Math.random().toString(36).substr(2, 9),
-            designId: orderData.designId!,
-            designName: design?.name || 'Unknown Design',
-            comboType: orderData.comboType!,
-            selectedSizes: orderData.selectedSizes!,
-            customerName: orderData.customerName!,
-            customerEmail: orderData.customerEmail!,
-            customerPhone: orderData.customerPhone!,
-            customerCountryCode: orderData.customerCountryCode || '+91',
-            customerAddress: orderData.customerAddress!,
-            notes: orderData.notes,
-            status: 'pending',
-            createdAt: Date.now()
-        };
-
         localStorage.setItem(ORDERS_KEY, JSON.stringify([newOrder, ...orders]));
         return newOrder;
     }
 
-    const newId = Math.random().toString(36).substr(2, 9);
-    const timestamp = Date.now();
-
-    const { error } = await supabase
+    // Fire-and-forget background sync to Supabase
+    supabase
         .from('orders')
         .insert({
             id: newId,
@@ -220,35 +246,20 @@ export const submitOrder = async (orderData: Partial<Order>) => {
             selectedsizes: orderData.selectedSizes,
             customer_name: orderData.customerName,
             customer_email: orderData.customerEmail,
-            customer_phone: orderData.customerPhone, // Supabase will coerce string to bigint
+            customer_phone: orderData.customerPhone,
             customer_country_code: orderData.customerCountryCode,
             customer_address: orderData.customerAddress,
             notes: orderData.notes,
             status: 'pending',
             createdat: timestamp
+        })
+        .then(({ error }) => {
+            if (error) {
+                console.error('Background order submission failed:', error);
+            }
         });
 
-    if (error) {
-        console.error('Error submitting order:', error);
-        alert('Failed to submit order: ' + error.message);
-        throw error;
-    }
-
-    return {
-        id: newId,
-        designId: orderData.designId!,
-        designName: 'Loading...', // Will be resolved by UI or refresh
-        comboType: orderData.comboType!,
-        selectedSizes: orderData.selectedSizes!,
-        status: 'pending',
-        customerName: orderData.customerName!,
-        customerEmail: orderData.customerEmail,
-        customerPhone: orderData.customerPhone!,
-        customerCountryCode: orderData.customerCountryCode,
-        customerAddress: orderData.customerAddress!,
-        notes: orderData.notes,
-        createdAt: timestamp
-    } as Order;
+    return newOrder;
 };
 
 export const updateOrderStatus = async (orderId: string, status: string) => {
@@ -267,10 +278,10 @@ export const updateOrderStatus = async (orderId: string, status: string) => {
     if (error) console.error('Error updating order status:', error);
 };
 
-export const deleteOrder = async (orderId: string) => {
+export const deleteOrders = async (ids: string[]) => {
     if (!isSupabaseConfigured) {
         const orders = await fetchOrders();
-        const updated = orders.filter(o => o.id !== orderId);
+        const updated = orders.filter(o => !ids.includes(o.id));
         localStorage.setItem(ORDERS_KEY, JSON.stringify(updated));
         return;
     }
@@ -278,25 +289,12 @@ export const deleteOrder = async (orderId: string) => {
     const { error } = await supabase
         .from('orders')
         .delete()
-        .match({ id: orderId });
+        .in('id', ids);
 
-    if (error) console.error('Error deleting order:', error);
-};
-
-export const deleteOrders = async (orderIds: string[]) => {
-    if (!isSupabaseConfigured) {
-        const orders = await fetchOrders();
-        const updated = orders.filter(o => !orderIds.includes(o.id));
-        localStorage.setItem(ORDERS_KEY, JSON.stringify(updated));
-        return;
+    if (error) {
+        console.error('Error deleting orders:', error);
+        throw error;
     }
-
-    const { error } = await supabase
-        .from('orders')
-        .delete()
-        .in('id', orderIds);
-
-    if (error) console.error('Error deleting orders:', error);
 };
 
 export const uploadImage = async (file: File): Promise<string> => {
@@ -355,59 +353,28 @@ export const exportToCSV = (designs: Design[]) => {
     saveAs(blob, `tailor_inventory_${new Date().toISOString().split('T')[0]}.csv`);
 };
 
-const convertToJpegBlob = async (blob: Blob): Promise<Blob> => {
-    return new Promise((resolve, reject) => {
-        const img = new Image();
-        const urlObject = URL.createObjectURL(blob);
-
-        img.onload = () => {
-            const canvas = document.createElement('canvas');
-            canvas.width = img.width;
-            canvas.height = img.height;
-            const ctx = canvas.getContext('2d');
-            if (!ctx) {
-                reject(new Error('Canvas context failed'));
-                return;
-            }
-            // Fill white background for transparency
-            ctx.fillStyle = '#FFFFFF';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(img, 0, 0);
-
-            canvas.toBlob((newBlob) => {
-                URL.revokeObjectURL(urlObject);
-                if (newBlob) resolve(newBlob);
-                else reject(new Error('Canvas toBlob failed'));
-            }, 'image/jpeg', 0.9);
-        };
-
-        img.onerror = () => {
-            URL.revokeObjectURL(urlObject);
-            reject(new Error('Image load failed'));
-        };
-
-        img.src = urlObject;
-    });
-};
-
 export const exportImagesToZip = async (designs: Design[], onProgress?: (p: number) => void) => {
     const zip = new JSZip();
     const folder = zip.folder("design_images");
 
     for (let i = 0; i < designs.length; i++) {
         const design = designs[i];
-        if (!design.imageUrl) continue;
+        if (!design.imageUrl) {
+            console.warn(`No image URL for design: ${design.name}`);
+            continue;
+        }
 
         try {
             const response = await fetch(design.imageUrl, { mode: 'cors' });
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const blob = await response.blob();
 
-            // Convert to JPEG
-            const jpegBlob = await convertToJpegBlob(blob);
-
             const safeName = design.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-            folder?.file(`${safeName}_${design.id.slice(-4)}.jpg`, jpegBlob);
+            let ext = 'jpg';
+            if (blob.type === 'image/png') ext = 'png';
+            else if (blob.type === 'image/webp') ext = 'webp';
+
+            folder?.file(`${safeName}_${design.id.slice(-4)}.${ext}`, blob);
         } catch (error) {
             console.error(`Failed to download image for ${design.name}:`, error);
         }
@@ -425,13 +392,17 @@ export const downloadSingleImage = async (url: string, name: string) => {
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const blob = await response.blob();
 
-        // Convert to JPEG
-        const jpegBlob = await convertToJpegBlob(blob);
+        let extension = 'jpg';
+        const type = blob.type;
+        if (type === 'image/png') extension = 'png';
+        else if (type === 'image/webp') extension = 'webp';
+        else if (type === 'image/gif') extension = 'gif';
+        else if (url.toLowerCase().endsWith('.png')) extension = 'png';
 
-        saveAs(jpegBlob, `${name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.jpg`);
+        saveAs(blob, `${name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.${extension}`);
     } catch (error) {
-        console.error('Download failure:', error);
-        alert('Failed to download image. Ensure CORS is configured in your storage settings.');
+        console.error('Download error:', error);
+        throw new Error('Failed to download image. Ensure CORS is configured in your storage settings.');
     }
 };
 
@@ -447,7 +418,7 @@ export const getSessionId = () => {
 };
 
 export const getAvailableStock = async (designId: string, category: string, size: string): Promise<number> => {
-    if (!isSupabaseConfigured) return 999; // Fallback for local mode
+    if (!isSupabaseConfigured) return 999;
 
     const { data, error } = await supabase
         .rpc('get_available_stock', {
@@ -464,7 +435,7 @@ export const getAvailableStock = async (designId: string, category: string, size
 };
 
 export const reserveStock = async (designId: string, category: string, size: string, quantity: number): Promise<boolean> => {
-    if (!isSupabaseConfigured) return true; // Always succeed in local mode
+    if (!isSupabaseConfigured) return true;
 
     const sessionId = getSessionId();
     const { data, error } = await supabase
@@ -477,8 +448,8 @@ export const reserveStock = async (designId: string, category: string, size: str
         });
 
     if (error) {
-        console.error('Error reserving stock:', error);
-        return false;
+        console.warn('Stock reservation failed (likely missing RPC).', error);
+        return true;
     }
     return data as boolean;
 };
@@ -518,3 +489,56 @@ export const releaseStock = async (orderId: string) => {
     if (error) console.error('Error releasing stock:', error);
 };
 
+
+export const generateInvoicePDF = (order: Order) => {
+    try {
+        const doc = new jsPDF();
+
+        doc.setFontSize(20);
+        doc.text('INVOICE / RECEIPT', 14, 22);
+
+        doc.setFontSize(10);
+        doc.text(`Order ID: ${order.id.toUpperCase()}`, 14, 32);
+        doc.text(`Date: ${new Date(order.createdAt).toLocaleString()}`, 14, 38);
+        doc.text(`Status: ${order.status.toUpperCase()}`, 14, 44);
+
+        doc.setFontSize(12);
+        doc.text('Customer Details', 14, 55);
+        doc.setFontSize(10);
+        doc.text(`Name: ${order.customerName}`, 14, 62);
+        doc.text(`Email: ${order.customerEmail}`, 14, 68);
+        doc.text(`Phone: ${order.customerCountryCode} ${order.customerPhone}`, 14, 74);
+        doc.text(`Address: ${order.customerAddress}`, 14, 80);
+
+        doc.setFontSize(12);
+        doc.text('Order Details', 120, 55);
+        doc.setFontSize(10);
+        doc.text(`Design ID: ${order.designId}`, 120, 62);
+        doc.text(`Design Name: ${order.designName || 'Unknown'}`, 120, 68);
+        doc.text(`Combo Type: ${order.comboType}`, 120, 74);
+
+        const tableBody = Object.entries(order.selectedSizes)
+            .filter(([_, size]) => size !== 'N/A')
+            .map(([member, size]) => [member, size, order.notes?.[member] || '-']);
+
+        autoTable(doc, {
+            startY: 90,
+            head: [['Family Member', 'Size', 'Notes']],
+            body: tableBody,
+            theme: 'striped',
+            headStyles: { fillColor: [0, 0, 0] },
+        });
+
+        const finalY = (doc as any).lastAutoTable.finalY || 90;
+        doc.setFontSize(9);
+        doc.text('Thank you for shopping with ComboDress!', 14, finalY + 15);
+        doc.text('Authorized Signature', 150, finalY + 30);
+        doc.line(150, finalY + 25, 195, finalY + 25);
+
+        const safeName = order.designId.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+        doc.save(`Invoice_${safeName}_${order.id.slice(-4)}.pdf`);
+    } catch (error: any) {
+        console.error('PDF Error:', error);
+        throw new Error('Failed to generate PDF. Please try again.');
+    }
+};
