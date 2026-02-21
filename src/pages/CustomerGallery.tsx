@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import type { Design, ComboType, AdultSizeStock, KidsSizeStock } from '../types';
 import { Sparkles, ArrowRight, CheckCircle, Filter, Users, Baby, Download, X, Search } from 'lucide-react';
-import { downloadSingleImage } from '../data';
+import { downloadSingleImage, exportImagesToZip } from '../data';
+import { saveAs } from 'file-saver';
 
 interface CustomerGalleryProps {
     designs: Design[];
@@ -16,6 +17,8 @@ const CustomerGallery: React.FC<CustomerGalleryProps> = ({ designs, onSelect, se
     const [search, setSearch] = useState('');
     const [activeFilter, setActiveFilter] = useState<string>('ALL');
     const [showResults, setShowResults] = useState(false);
+    const [showDownloadPrompt, setShowDownloadPrompt] = useState(false);
+    const [isDownloading, setIsDownloading] = useState(false);
 
     // Add effect to handle body scroll
     React.useEffect(() => {
@@ -47,10 +50,11 @@ const CustomerGallery: React.FC<CustomerGalleryProps> = ({ designs, onSelect, se
     const kidsSizes: (keyof KidsSizeStock)[] = ['0-1', '1-2', '2-3', '3-4', '4-5', '5-6', '6-7', '7-8', '9-10', '11-12', '13-14'];
 
     const combos: { id: ComboType; label: string }[] = [
-        { id: 'F-M-S-D', label: 'Full Family Set' },
+        { id: 'F-M-S-D', label: 'Family Combo' },
         { id: 'F-S', label: 'Father & Son' },
         { id: 'M-D', label: 'Mother & Daughter' },
         { id: 'F-M', label: 'Couple Set' },
+        { id: 'S-D', label: 'Siblings Combo' },
     ];
 
     const childCategories: { id: 'boys' | 'girls' | 'unisex'; label: string }[] = [
@@ -64,6 +68,7 @@ const CustomerGallery: React.FC<CustomerGalleryProps> = ({ designs, onSelect, se
         'F-S': ['men', 'boys'],
         'M-D': ['women', 'girls'],
         'F-M': ['men', 'women'],
+        'S-D': ['boys', 'girls'],
         'Custom': [] as string[],
     };
 
@@ -76,6 +81,58 @@ const CustomerGallery: React.FC<CustomerGalleryProps> = ({ designs, onSelect, se
             daughters: ['N/A']
         });
         setShowResults(false);
+    };
+
+    const handleDownloadZip = async () => {
+        setIsDownloading(true);
+        setShowDownloadPrompt(false);
+        try {
+            await exportImagesToZip(filteredDesigns);
+            showNotification(`Successfully generated ZIP with ${filteredDesigns.length} images.`, 'success');
+        } catch (error) {
+            showNotification('Failed to generate ZIP file.', 'error');
+        } finally {
+            setIsDownloading(false);
+        }
+    };
+
+    const handleDownloadIndividual = async () => {
+        setShowDownloadPrompt(false);
+        setIsDownloading(true);
+        showNotification(`Preparing ${filteredDesigns.length} images for download...`, 'info');
+
+        try {
+            // Pre-fetch all images as Blobs in parallel to minimize browser prompts
+            const results = await Promise.all(
+                filteredDesigns.map(async (design) => {
+                    const response = await fetch(design.imageUrl, { mode: 'cors' });
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    const blob = await response.blob();
+
+                    let ext = 'jpg';
+                    if (blob.type === 'image/png') ext = 'png';
+                    else if (blob.type === 'image/webp') ext = 'webp';
+                    else if (design.imageUrl.toLowerCase().endsWith('.png')) ext = 'png';
+
+                    return {
+                        blob,
+                        fileName: `${design.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.${ext}`
+                    };
+                })
+            );
+
+            // Trigger all downloads synchronously once all Blobs are ready
+            results.forEach(({ blob, fileName }) => {
+                saveAs(blob, fileName);
+            });
+
+            showNotification('Downloads triggered successfully.', 'success');
+        } catch (error) {
+            console.error('Individual download error:', error);
+            showNotification('Failed to download some images. Check CORS settings.', 'error');
+        } finally {
+            setIsDownloading(false);
+        }
     };
 
     const filteredDesigns = useMemo(() => {
@@ -337,7 +394,7 @@ const CustomerGallery: React.FC<CustomerGalleryProps> = ({ designs, onSelect, se
 
                         {/* Boys */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minHeight: '66px' }}>
-                            {(activeFilter === 'ALL' || activeFilter === 'boys' || activeFilter === 'unisex' || activeFilter === 'F-S' || activeFilter === 'F-M-S-D') && (
+                            {(activeFilter === 'ALL' || activeFilter === 'boys' || activeFilter === 'unisex' || activeFilter === 'F-S' || activeFilter === 'F-M-S-D' || activeFilter === 'S-D') && (
                                 <>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '14px' }}>
                                         <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>Son Size</label>
@@ -378,7 +435,7 @@ const CustomerGallery: React.FC<CustomerGalleryProps> = ({ designs, onSelect, se
 
                         {/* Girls */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minHeight: '66px' }}>
-                            {(activeFilter === 'ALL' || activeFilter === 'girls' || activeFilter === 'unisex' || activeFilter === 'M-D' || activeFilter === 'F-M-S-D') && (
+                            {(activeFilter === 'ALL' || activeFilter === 'girls' || activeFilter === 'unisex' || activeFilter === 'M-D' || activeFilter === 'F-M-S-D' || activeFilter === 'S-D') && (
                                 <>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '14px' }}>
                                         <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>Daughter Size</label>
@@ -508,24 +565,50 @@ const CustomerGallery: React.FC<CustomerGalleryProps> = ({ designs, onSelect, se
                                     Found {filteredDesigns.length} matching your criteria
                                 </p>
                             </div>
-                            <button
-                                onClick={() => setShowResults(false)}
-                                className="touch-target"
-                                style={{
-                                    background: 'var(--bg-secondary)',
-                                    border: 'none',
-                                    borderRadius: '12px',
-                                    cursor: 'pointer',
-                                    width: '44px',
-                                    height: '44px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center'
-                                }}
-                                title="Close Results"
-                            >
-                                <X size={20} color="var(--primary)" />
-                            </button>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                {filteredDesigns.length > 0 && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setShowDownloadPrompt(true);
+                                        }}
+                                        className="btn btn-ghost"
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px',
+                                            padding: '8px 16px',
+                                            borderRadius: '12px',
+                                            border: '1px solid var(--border-subtle)',
+                                            background: 'var(--bg-secondary)',
+                                            fontSize: '0.85rem'
+                                        }}
+                                        disabled={isDownloading}
+                                    >
+                                        <Download size={16} />
+                                        <span className="tablet-up">{isDownloading ? 'Processing...' : 'Download All Images'}</span>
+                                        <span className="mobile-only">{isDownloading ? '...' : 'All'}</span>
+                                    </button>
+                                )}
+                                <button
+                                    onClick={() => setShowResults(false)}
+                                    className="touch-target"
+                                    style={{
+                                        background: 'var(--bg-secondary)',
+                                        border: 'none',
+                                        borderRadius: '12px',
+                                        cursor: 'pointer',
+                                        width: '44px',
+                                        height: '44px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center'
+                                    }}
+                                    title="Close Results"
+                                >
+                                    <X size={20} color="var(--primary)" />
+                                </button>
+                            </div>
                         </div>
 
                         <div style={{
@@ -568,8 +651,8 @@ const CustomerGallery: React.FC<CustomerGalleryProps> = ({ designs, onSelect, se
                                                 const config = {
                                                     father: (activeFilter === 'ALL' || activeFilter === 'F-S' || activeFilter === 'F-M' || activeFilter === 'F-M-S-D') ? filterSizes.father : 'N/A',
                                                     mother: (activeFilter === 'ALL' || activeFilter === 'M-D' || activeFilter === 'F-M' || activeFilter === 'F-M-S-D') ? filterSizes.mother : 'N/A',
-                                                    sons: (activeFilter === 'ALL' || activeFilter === 'boys' || activeFilter === 'unisex' || activeFilter === 'F-S' || activeFilter === 'F-M-S-D') ? filterSizes.sons : [],
-                                                    daughters: (activeFilter === 'ALL' || activeFilter === 'girls' || activeFilter === 'unisex' || activeFilter === 'M-D' || activeFilter === 'F-M-S-D') ? filterSizes.daughters : []
+                                                    sons: (activeFilter === 'ALL' || activeFilter === 'boys' || activeFilter === 'unisex' || activeFilter === 'F-S' || activeFilter === 'F-M-S-D' || activeFilter === 'S-D') ? filterSizes.sons : [],
+                                                    daughters: (activeFilter === 'ALL' || activeFilter === 'girls' || activeFilter === 'unisex' || activeFilter === 'M-D' || activeFilter === 'F-M-S-D' || activeFilter === 'S-D') ? filterSizes.daughters : []
                                                 };
                                                 onSelect(design, activeFilter, config);
                                             }}
@@ -653,8 +736,8 @@ const CustomerGallery: React.FC<CustomerGalleryProps> = ({ designs, onSelect, se
                                                             const config = {
                                                                 father: (activeFilter === 'ALL' || activeFilter === 'F-S' || activeFilter === 'F-M' || activeFilter === 'F-M-S-D') ? filterSizes.father : 'N/A',
                                                                 mother: (activeFilter === 'ALL' || activeFilter === 'M-D' || activeFilter === 'F-M' || activeFilter === 'F-M-S-D') ? filterSizes.mother : 'N/A',
-                                                                sons: (activeFilter === 'ALL' || activeFilter === 'boys' || activeFilter === 'unisex' || activeFilter === 'F-S' || activeFilter === 'F-M-S-D') ? filterSizes.sons : [],
-                                                                daughters: (activeFilter === 'ALL' || activeFilter === 'girls' || activeFilter === 'unisex' || activeFilter === 'M-D' || activeFilter === 'F-M-S-D') ? filterSizes.daughters : []
+                                                                sons: (activeFilter === 'ALL' || activeFilter === 'boys' || activeFilter === 'unisex' || activeFilter === 'F-S' || activeFilter === 'F-M-S-D' || activeFilter === 'S-D') ? filterSizes.sons : [],
+                                                                daughters: (activeFilter === 'ALL' || activeFilter === 'girls' || activeFilter === 'unisex' || activeFilter === 'M-D' || activeFilter === 'F-M-S-D' || activeFilter === 'S-D') ? filterSizes.daughters : []
                                                             };
                                                             onSelect(design, activeFilter, config);
                                                         }}
@@ -675,6 +758,74 @@ const CustomerGallery: React.FC<CustomerGalleryProps> = ({ designs, onSelect, se
                                     ))}
                                 </div>
                             )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showDownloadPrompt && (
+                <div style={{
+                    position: 'fixed',
+                    inset: 0,
+                    zIndex: 4000,
+                    background: 'rgba(0,0,0,0.6)',
+                    backdropFilter: 'blur(8px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '20px',
+                    animation: 'fadeIn 0.2s ease-out'
+                }}>
+                    <div style={{
+                        width: 'min(90%, 400px)',
+                        background: 'var(--bg-main)',
+                        borderRadius: '24px',
+                        padding: '32px',
+                        boxShadow: 'var(--shadow-xl)',
+                        textAlign: 'center',
+                        position: 'relative',
+                        animation: 'slideUp 0.3s ease-out'
+                    }}>
+                        <button
+                            onClick={() => setShowDownloadPrompt(false)}
+                            style={{ position: 'absolute', top: '20px', right: '20px', background: 'none', border: 'none', cursor: 'pointer', opacity: 0.5 }}
+                        >
+                            <X size={20} />
+                        </button>
+
+                        <div style={{ marginBottom: '24px' }}>
+                            <div style={{ width: '64px', height: '64px', background: 'var(--bg-secondary)', borderRadius: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+                                <Download size={32} color="var(--primary)" />
+                            </div>
+                            <h3 style={{ margin: '0 0 8px 0', fontSize: '1.25rem', fontWeight: 700 }}>Choose download format</h3>
+                            <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                                Select how you want to download all {filteredDesigns.length} images.
+                            </p>
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            <button
+                                onClick={handleDownloadZip}
+                                className="btn btn-primary"
+                                style={{ width: '100%', padding: '14px', borderRadius: '12px', fontSize: '1rem', fontWeight: 600 }}
+                            >
+                                Download as ZIP file
+                            </button>
+                            <button
+                                onClick={handleDownloadIndividual}
+                                className="btn btn-ghost"
+                                style={{
+                                    width: '100%',
+                                    padding: '14px',
+                                    borderRadius: '12px',
+                                    border: '1px solid var(--border-subtle)',
+                                    fontSize: '1rem',
+                                    fontWeight: 600,
+                                    background: 'var(--bg-secondary)'
+                                }}
+                            >
+                                Download as Individual Files
+                            </button>
                         </div>
                     </div>
                 </div>

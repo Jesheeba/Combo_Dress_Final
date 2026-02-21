@@ -1,4 +1,4 @@
-export type ComboType = 'F-M-S-D' | 'F-S' | 'M-D' | 'F-M' | 'Custom';
+export type ComboType = 'F-M-S-D' | 'F-S' | 'M-D' | 'F-M' | 'S-D' | 'Custom';
 
 export interface AdultSizeStock {
   M: number;

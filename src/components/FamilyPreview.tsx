@@ -42,6 +42,7 @@ const FamilyPreview: React.FC<FamilyPreviewProps> = ({ design, category = 'ALL',
         if (effectiveCategory === 'F-S') return member === 'men' || member === 'boys';
         if (effectiveCategory === 'M-D') return member === 'women' || member === 'girls';
         if (effectiveCategory === 'F-M') return member === 'men' || member === 'women';
+        if (effectiveCategory === 'S-D') return member === 'boys' || member === 'girls';
 
         return false;
     };
